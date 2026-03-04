@@ -105,7 +105,7 @@ class MMClaw(object):
                             # Break inner loop to start with fresh memory on next user input
                             break
                         elif name == "upgrade":
-                            self.connector.send("⬆️ Upgrading MMClaw...")
+                            self.connector.send("⬆️ Upgrading MMClaw... (this is tricky — there's no notification when it's done. Please wait a moment, then ask me for my version number to confirm the upgrade succeeded.)")
                             result = UpgradeTool.upgrade()  # restarts process on success; only returns on failure
                             self.connector.send(f"❌ Upgrade failed: {result}")
 
