@@ -713,8 +713,11 @@ class QQBotConnector(object):
         connector._client = MMClawBot(intents=intents, bot_log=False)
         connector._client.run(appid=self.app_id, secret=self.app_secret)
 
-    def start_typing(self): pass
-    def stop_typing(self): pass
+    def start_typing(self):
+        self.send("⏳")
+
+    def stop_typing(self):
+        self.send("✅")
 
     async def _send_async(self, text):
         if not self._last_message or not self._api:
