@@ -11,7 +11,9 @@ pip install mmclaw
 <img src="https://raw.githubusercontent.com/CrawlScript/MMClaw/main/MMCLAW_LOGO.jpg" width="400"/>
 </p>
 
-**主页:** [https://github.com/CrawlScript/MMClaw](https://github.com/CrawlScript/MMClaw)
+**主页:** [https://mmclaw.github.io](https://mmclaw.github.io)
+
+**GitHub:** [https://github.com/CrawlScript/MMClaw](https://github.com/CrawlScript/MMClaw)
 
 [English](https://github.com/CrawlScript/MMClaw/blob/main/README.md) | **中文说明**
 
