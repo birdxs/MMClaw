@@ -166,15 +166,20 @@ class FileMemory(BaseMemory):
         lines = [f"[{i}] ({m['date']}) {m['memory']}" for i, m in enumerate(memories)]
         return "\n".join(lines)
 
-    def global_memory_delete(self, index: int) -> str:
+    def global_memory_delete(self, indices) -> str:
+        if isinstance(indices, int):
+            indices = [indices]
         memories = self._load_global_memories()
-        if index < 0 or index >= len(memories):
-            return f"Error: index {index} out of range (0-{len(memories)-1})."
-        memories.pop(index)
+        invalid = [i for i in indices if i < 0 or i >= len(memories)]
+        if invalid:
+            return f"Error: indices {invalid} out of range (0-{len(memories)-1})."
+        for i in sorted(set(indices), reverse=True):
+            memories.pop(i)
         with open(self.GLOBAL_MEMORY_FILE, "w", encoding="utf-8") as f:
             for m in memories:
                 f.write(json.dumps(m, ensure_ascii=False) + "\n")
-        return f"Memory [{index}] deleted."
+        remaining = "\n".join(f"[{i}] ({m['date']}) {m['memory']}" for i, m in enumerate(memories))
+        return f"Deleted {len(indices)} memor{'y' if len(indices)==1 else 'ies'}. Remaining:\n{remaining or '(none)'}"
 
     def _load_global_memories(self):
         if not os.path.exists(self.GLOBAL_MEMORY_FILE):

@@ -1,4 +1,5 @@
 import threading
+import traceback
 import queue
 import json
 import re
@@ -30,7 +31,8 @@ class MMClaw(object):
                 decoder = json.JSONDecoder()
                 obj, _ = decoder.raw_decode(text[start_idx:])
                 return obj
-        except Exception:
+        except Exception as e:
+            print(f"[!] _extract_json failed: {e}\n    text: {repr(text[:200])}")
             return None
         return None
 
@@ -56,12 +58,19 @@ class MMClaw(object):
                     self.memory.add("assistant", raw_text)
 
                     data = self._extract_json(raw_text)
+                    # print(f"[D] data={repr(data)}")
                     if not data:
                         self.connector.send(raw_text)
                         break
 
                     if data.get("content"):
-                        self.connector.send(data["content"])
+                        content = data["content"]
+                        if not isinstance(content, str):
+                            try:
+                                content = json.dumps(content, ensure_ascii=False)
+                            except Exception:
+                                content = "[Error: unexpected content format]"
+                        self.connector.send(content)
 
                     tools = data.get("tools", [])
                     if not tools:
@@ -109,8 +118,13 @@ class MMClaw(object):
                             self.connector.send("🧠 Listing global memories...")
                             result = self.memory.global_memory_list()
                         elif name == "memory_delete":
-                            self.connector.send(f"🧠 Delete memory [{args.get('index')}]")
-                            result = self.memory.global_memory_delete(int(args.get("index", -1)))
+                            indices = args.get("indices", args.get("index", -1))
+                            if isinstance(indices, list):
+                                indices = [int(i) for i in indices]
+                            else:
+                                indices = int(indices)
+                            self.connector.send(f"🧠 Delete memory {indices}")
+                            result = self.memory.global_memory_delete(indices)
                         elif name == "upgrade":
                             self.connector.send("⬆️ Upgrading MMClaw... (this is tricky — there's no notification when it's done. Please wait a moment, then ask me for my version number to confirm the upgrade succeeded.)")
                             result = UpgradeTool.upgrade()  # restarts process on success; only returns on failure
@@ -123,6 +137,7 @@ class MMClaw(object):
 
             except Exception as e:
                 print(f"[!] Worker error: {e}")
+                traceback.print_exc()
             finally:
                 self.connector.stop_typing()
                 self.task_queue.task_done()
