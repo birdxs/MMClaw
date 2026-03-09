@@ -40,6 +40,7 @@ Control your AI agent from anywhere, through the apps you already use.
 - **Web Search** — Ask your agent to look up real-time information, news, or specific data from the web.
 - **Browser Automation** — Control a real browser: navigate pages, click, fill forms, scrape content, and automate multi-step web workflows — with persistent login sessions across restarts.
 - **Custom Skills** — Extend your agent with your own skills; teach it new commands, workflows, and domain knowledge to do exactly what you need.
+- **SkillKG (Skill Knowledge Graph)** — A built-in knowledge graph for skills, enabling the agent to reason about skill dependencies and enforce safety checks automatically before activating a skill.
 - **Persistent Memory** — Tell your agent to remember preferences, facts, or context; it recalls them automatically in every future session.
 - **Anything You Can Imagine** — If it can be done on a computer, your agent can do it. The only limit is your imagination.
 
@@ -54,6 +55,7 @@ Control your AI agent from anywhere, through the apps you already use.
 * Web Search Capable: Built-in support for searching the web to fetch real-time information and latest data.
 * Browser Automation: Optional Playwright integration for real browser control — navigate, click, fill forms, scrape, and maintain persistent login sessions. Enable via `mmclaw config`.
 * Multi-Channel Interaction: Built-in support for interacting with your agent via Telegram, WhatsApp, Feishu (飞书), QQ Bot (QQ机器人), and more—all handled through pure Python integrations.
+* **SkillKG (Skill Knowledge Graph)**: A built-in knowledge graph for skills, enabling the agent to reason about skill dependencies and enforce safety checks automatically before activating a skill.
 
 ## 🚀 Quick Start
 
