@@ -214,10 +214,12 @@ class MMClaw(object):
                 break
 
             if is_heartbeat:
-                silent = "all" if user_text.startswith("[HEARTBEAT_DISCOVER:") else "tools"
+                silent_tools   = True
+                silent_content = user_text.startswith("[HEARTBEAT_DISCOVER:")
                 history = [{"role": "user", "content": user_text}]
             else:
-                silent = False
+                silent_tools   = user_text.startswith("[WATCHER:")
+                silent_content = False
                 self.memory.add("user", user_text)
 
             self.connector.start_typing()
@@ -241,7 +243,7 @@ class MMClaw(object):
                     data = self._extract_json(raw_text)
                     # print(f"[D] data={repr(data)}")
                     if not data:
-                        if silent != "all":
+                        if not silent_content:
                             self.connector.send(raw_text)
                         break
 
@@ -252,7 +254,7 @@ class MMClaw(object):
                                 content = json.dumps(content, ensure_ascii=False)
                             except Exception:
                                 content = "[Error: unexpected content format]"
-                        if silent != "all":
+                        if not silent_content:
                             self.connector.send(content)
 
                     tools = data.get("tools", [])
@@ -270,35 +272,35 @@ class MMClaw(object):
 
                         result = ""
                         if name == "shell_execute":
-                            if silent is False: self.connector.send(f"🐚 Shell: `{args.get('command')}`")
+                            if not silent_tools:self.connector.send(f"🐚 Shell: `{args.get('command')}`")
                             result = ShellTool.execute(args.get("command"))
                         elif name == "shell_async":
-                            if silent is False: self.connector.send(f"🚀 Async Shell: `{args.get('command')}`")
+                            if not silent_tools:self.connector.send(f"🚀 Async Shell: `{args.get('command')}`")
                             result = AsyncShellTool.execute(args.get("command"))
                         elif name == "file_read":
-                            if silent is False: self.connector.send(f"📖 Read: `{args.get('path')}`")
+                            if not silent_tools:self.connector.send(f"📖 Read: `{args.get('path')}`")
                             result = FileTool.read(args.get("path"))
                         elif name == "file_write":
-                            if silent is False: self.connector.send(f"💾 Write: `{args.get('path')}`")
+                            if not silent_tools:self.connector.send(f"💾 Write: `{args.get('path')}`")
                             result = FileTool.write(args.get("path"), args.get("content"))
                         elif name == "file_upload":
-                            if silent is False: self.connector.send(f"📤 Upload: `{args.get('path')}`")
+                            if not silent_tools:self.connector.send(f"📤 Upload: `{args.get('path')}`")
                             self.connector.send_file(args.get("path"))
                             result = f"File {args.get('path')} sent."
                         elif name == "wait":
-                            if silent is False: self.connector.send(f"⏳ Waiting {args.get('seconds')}s...")
+                            if not silent_tools:self.connector.send(f"⏳ Waiting {args.get('seconds')}s...")
                             result = TimerTool.wait(args.get("seconds"))
                         elif name == "reset_session":
                             self.memory.reset()
-                            if silent is False: self.connector.send("✨ Session reset! Starting fresh.")
+                            if not silent_tools:self.connector.send("✨ Session reset! Starting fresh.")
                             result = "Success: Session history cleared."
                             session_reset = True
                             break
                         elif name == "memory_add":
-                            if silent is False: self.connector.send(f"🧠 Memorize: `{args.get('memory', '')}`")
+                            if not silent_tools:self.connector.send(f"🧠 Memorize: `{args.get('memory', '')}`")
                             result = self.memory.global_memory_add(args.get("memory", ""))
                         elif name == "memory_list":
-                            if silent is False: self.connector.send("🧠 Listing global memories...")
+                            if not silent_tools:self.connector.send("🧠 Listing global memories...")
                             result = self.memory.global_memory_list()
                         elif name == "memory_delete":
                             indices = args.get("indices", args.get("index", -1))
@@ -306,36 +308,36 @@ class MMClaw(object):
                                 indices = [int(i) for i in indices]
                             else:
                                 indices = int(indices)
-                            if silent is False: self.connector.send(f"🧠 Delete memory {indices}")
+                            if not silent_tools:self.connector.send(f"🧠 Delete memory {indices}")
                             result = self.memory.global_memory_delete(indices)
                         elif name == "browser_start":
-                            if silent is False: self.connector.send("🌐 Starting browser...")
+                            if not silent_tools:self.connector.send("🌐 Starting browser...")
                             user_data_dir = self.config.get("browser", {}).get("data_dir")
                             result = BrowserTool.start(user_data_dir=user_data_dir)
                         elif name == "browser_stop":
-                            if silent is False: self.connector.send("🌐 Stopping browser...")
+                            if not silent_tools:self.connector.send("🌐 Stopping browser...")
                             result = BrowserTool.stop()
                         elif name == "browser_navigate":
-                            if silent is False: self.connector.send(f"🌐 Navigate: `{args.get('url')}`")
+                            if not silent_tools:self.connector.send(f"🌐 Navigate: `{args.get('url')}`")
                             result = BrowserTool.navigate(args.get("url"))
                         elif name == "browser_click":
-                            if silent is False: self.connector.send(f"🌐 Click: `{args.get('selector')}`")
+                            if not silent_tools:self.connector.send(f"🌐 Click: `{args.get('selector')}`")
                             result = BrowserTool.click(args.get("selector"))
                         elif name == "browser_fill":
-                            if silent is False: self.connector.send(f"🌐 Fill: `{args.get('selector')}`")
+                            if not silent_tools:self.connector.send(f"🌐 Fill: `{args.get('selector')}`")
                             result = BrowserTool.fill(args.get("selector"), args.get("text", ""))
                         elif name == "browser_get_text":
-                            if silent is False: self.connector.send(f"🌐 Get text: `{args.get('selector', 'body')}`")
+                            if not silent_tools:self.connector.send(f"🌐 Get text: `{args.get('selector', 'body')}`")
                             result = BrowserTool.get_text(args.get("selector"))
                         elif name == "browser_screenshot":
-                            if silent is False: self.connector.send("🌐 Screenshot...")
+                            if not silent_tools:self.connector.send("🌐 Screenshot...")
                             result = BrowserTool.screenshot(args.get("path"))
                             if result.startswith("OK:"):
-                                if silent is False: self.connector.send_file(result[4:].strip())
+                                if not silent_tools:self.connector.send_file(result[4:].strip())
                         elif name == "upgrade":
-                            if silent is False: self.connector.send("⬆️ Upgrading MMClaw... (this is tricky — there's no notification when it's done. Please wait a moment, then ask me for my version number to confirm the upgrade succeeded.)")
+                            if not silent_tools:self.connector.send("⬆️ Upgrading MMClaw... (this is tricky — there's no notification when it's done. Please wait a moment, then ask me for my version number to confirm the upgrade succeeded.)")
                             result = UpgradeTool.upgrade()  # restarts process on success; only returns on failure
-                            if silent is False: self.connector.send(f"❌ Upgrade failed: {result}")
+                            if not silent_tools:self.connector.send(f"❌ Upgrade failed: {result}")
 
                         if self.debug:
                             print(f"\n    [Tool Output: {name}]\n    {result}\n")
