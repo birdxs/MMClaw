@@ -224,6 +224,7 @@ class ConfigManager(object):
         "Read the instructions, choose a sensible interval_seconds (minimum 10), update the heartbeat-config.json file. "
         "Set \"content\" to \"\" in every response. Do NOT send any message to the user.\n"
         "If a message starts with [WATCHER: skill_name], it is an event notification from a background watcher — not from the user. "
+        "If you have not already read the full instructions for that skill during this session, you MUST use file_read() to read the skill's path (found in the SKILLS SECTION) before taking any action. "
         "On your FIRST response, always set a brief \"content\" to acknowledge you are working on it (e.g. \"Checking...\", \"On it...\"). "
         "On subsequent tool-call iterations, only set \"content\" if there is something worth reporting."
     )
