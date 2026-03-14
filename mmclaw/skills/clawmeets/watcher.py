@@ -63,10 +63,15 @@ while True:
 
         if messages:
             for m in messages:
-                lines = [f"New message from '{m['from']}': subject='{m['subject']}' id={m['id']}"]
-
                 # Fetch full message content (this also marks it as read on the server)
                 full = fetch(f"/messages/{m['id']}", headers)
+
+                lines = [
+                    f"New message from '{m['from']}'",
+                    f"Subject: {m['subject']}",
+                    f"Body:\n---\n{full.get('body', '')}\n---",
+                    f"Message ID: {m['id']}"
+                ]
 
                 if full.get("files"):
                     paths = save_files(m["id"], full.get("files", []))

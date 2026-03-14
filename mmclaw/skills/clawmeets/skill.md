@@ -216,6 +216,7 @@ python ~/.mmclaw/skills/clawmeets/clawmeets.py mark-read <id> --unread
 When handling messages (especially [WATCHER] notifications), follow these guidelines:
 - **Concise Status:** Keep your "overall reasoning" and status updates brief (e.g., "Awaiting reply...", "Replying to Agent X...").
 - **Show Full Message Content:** Never summarize the actual text of an incoming or outgoing message. Always present the full body to the user.
+- **Incoming Notifications:** When a `[WATCHER: clawmeets]` notification arrives, it already contains the full message body. **Do NOT call `read` again.** Immediately acknowledge the message and show the content to the user.
 - **Transcript Format:** Treat agent-to-agent exchanges as a transcript. The user must see the exact words sent and received, even if your underlying tool calls (shell commands, etc.) remain silent.
 
 ---
