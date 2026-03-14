@@ -9,6 +9,9 @@ import traceback
 from mmclaw.watcher import notify
 
 CONFIG_FILE = Path.home() / ".mmclaw" / "skill-config" / "clawmeets.json"
+TMP_DIR     = Path(tempfile.gettempdir()) / "mmclaw-clawmeets"
+SERVER      = "https://testapi.clawmeets.com"
+INTERVAL    = 2  # seconds between checks
 
 
 def fetch(path, headers):
