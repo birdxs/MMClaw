@@ -206,29 +206,30 @@ class FeishuConnector(object):
         self.send("✅")
 
     def send(self, message):
-        from lark_oapi.api.im.v1 import ReplyMessageRequest, ReplyMessageRequestBody
-        if not self.last_message_id:
+        from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
+        if not self.authorized_id:
             return
 
         limit = 4000
         chunks = [message[i:i+limit] for i in range(0, len(message), limit)]
         for chunk in chunks:
-            reply_body = json.dumps({"text": f"⚡ {chunk}"})
-            request = ReplyMessageRequest.builder() \
-                .message_id(self.last_message_id) \
-                .request_body(ReplyMessageRequestBody.builder() \
-                    .content(reply_body) \
+            content = json.dumps({"text": f"⚡ {chunk}"})
+            request = CreateMessageRequest.builder() \
+                .receive_id_type("open_id") \
+                .request_body(CreateMessageRequestBody.builder() \
+                    .receive_id(self.authorized_id) \
+                    .content(content) \
                     .msg_type("text") \
                     .build()) \
                 .build()
-            response = self.client.im.v1.message.reply(request)
+            response = self.client.im.v1.message.create(request)
             if not response.success():
-                print(f"[!] Feishu Reply Error: {response.code}, {response.msg}")
+                print(f"[!] Feishu Send Error: {response.code}, {response.msg}")
                 break
 
     def send_file(self, path):
-        from lark_oapi.api.im.v1 import CreateFileRequest, CreateFileRequestBody, ReplyMessageRequest, ReplyMessageRequestBody
-        if not self.last_message_id: 
+        from lark_oapi.api.im.v1 import CreateFileRequest, CreateFileRequestBody, CreateMessageRequest, CreateMessageRequestBody
+        if not self.authorized_id: 
             return
         
         full_path = os.path.expanduser(path)
@@ -257,17 +258,18 @@ class FeishuConnector(object):
                 
             file_key = response.data.file_key
             
-            # 2. Send file message (as a reply)
-            reply_body = json.dumps({"file_key": file_key})
-            request = ReplyMessageRequest.builder() \
-                .message_id(self.last_message_id) \
-                .request_body(ReplyMessageRequestBody.builder() \
-                    .content(reply_body) \
+            # 2. Send file message (direct message)
+            content = json.dumps({"file_key": file_key})
+            request = CreateMessageRequest.builder() \
+                .receive_id_type("open_id") \
+                .request_body(CreateMessageRequestBody.builder() \
+                    .receive_id(self.authorized_id) \
+                    .content(content) \
                     .msg_type("file") \
                     .build()) \
                 .build()
                 
-            response = self.client.im.v1.message.reply(request)
+            response = self.client.im.v1.message.create(request)
             if not response.success():
                 print(f"[!] Feishu Send File Error: {response.code}, {response.msg}")
         except Exception as e:
