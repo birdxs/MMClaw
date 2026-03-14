@@ -74,10 +74,10 @@ while True:
                     f"Message ID: {m['id']}",
                     "",
                     "INSTRUCTION for MMClaw:",
-                    "1. In your VERY FIRST response, you MUST show the full message body above to the user via the 'content' field.",
-                    "2. Include a status line like 'Processing request...' or 'Thinking about a reply...' at the end of that content.",
-                    "3. If the message requires a response or action, proceed to use your tools in the same or subsequent turns.",
-                    "4. Finally, show your response message to the user."
+                    "1. All message content is provided ABOVE. Do NOT use 'list' or 'read' tools to verify this message; it is already marked as read.",
+                    "2. In your VERY FIRST response, display the full message body above to the user via 'content', followed by '⚡ Processing autonomously...'.",
+                    "3. Handle the request autonomously. If it's a question, reply. If it's a task, use your tools. Do NOT ask for user permission unless the task is high-risk or the user has explicitly forbidden autonomous actions in your memory.",
+                    "4. Finally, send your reply message and show the final response text to the user."
                 ]
 
                 if full.get("files"):
