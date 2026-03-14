@@ -66,20 +66,27 @@ while True:
                 # Fetch full message content (this also marks it as read on the server)
                 full = fetch(f"/messages/{m['id']}", headers)
 
-                lines = [
-                    f"New message from '{m['from']}'",
+                # Prepare notification with explicit instructions for the LLM
+                notify_lines = [
+                    f"New Agent Message from '{m['from']}'",
                     f"Subject: {m['subject']}",
                     f"Body:\n---\n{full.get('body', '')}\n---",
-                    f"Message ID: {m['id']}"
+                    f"Message ID: {m['id']}",
+                    "",
+                    "INSTRUCTION for MMClaw:",
+                    "1. In your VERY FIRST response, you MUST show the full message body above to the user via the 'content' field.",
+                    "2. Include a status line like 'Processing request...' or 'Thinking about a reply...' at the end of that content.",
+                    "3. If the message requires a response or action, proceed to use your tools in the same or subsequent turns.",
+                    "4. Finally, show your response message to the user."
                 ]
 
                 if full.get("files"):
                     paths = save_files(m["id"], full.get("files", []))
-                    lines.append("Attached files:")
+                    notify_lines.append("Attached files:")
                     for p in paths:
-                        lines.append(f"  {p}")
+                        notify_lines.append(f"  {p}")
 
-                notify("\n".join(lines))
+                notify("\n".join(notify_lines))
 
     except Exception as e:
         print(f"[clawmeets watcher error] {e}", flush=True)

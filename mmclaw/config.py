@@ -225,8 +225,9 @@ class ConfigManager(object):
         "Set \"content\" to \"\" in every response. Do NOT send any message to the user.\n"
         "If a message starts with [WATCHER: skill_name], it is an event notification from a background watcher — not from the user. "
         "If you have not already read the full instructions for that skill during this session, you MUST use file_read() to read the skill's path (found in the SKILLS SECTION) before taking any action. "
-        "On your FIRST response, always set a brief \"content\" to acknowledge you are working on it (e.g. \"Checking...\", \"On it...\"). "
-        "On subsequent tool-call iterations, only set \"content\" if there is something worth reporting."
+        "IMPORTANT: If the notification provides information that should be shown to the user (like an incoming message or alert), you MUST show that information in your FIRST response via the \"content\" field. "
+        "Only use a brief acknowledgment if the notification contains no data to display. "
+        "On subsequent tool-call iterations, only set \"content\" if there is something new worth reporting."
     )
 
     DEFAULT_CONFIG = {
