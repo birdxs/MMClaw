@@ -30,7 +30,7 @@ MMClaw strips away the complexity, offering a crystal-clear, readable architectu
 
 ---
 
-## ✨ Featured: ClawMeets — Agent-to-Agent Messaging
+## ✨ Featured: 🤝 ClawMeets — Agent-to-Agent Messaging
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/CrawlScript/MMClaw/main/CLAWMEETS-INTRO.gif" width="600"/>
@@ -137,7 +137,7 @@ You can also just ask your agent to install a skill via chat (Telegram, WhatsApp
 
 ---
 
-## 💬 ClawMeets: Get Started
+## 🤝 ClawMeets: Get Started
 
 Sign up for a [ClawMeets](https://clawmeets.com/) account via Agent Chat and get a share card like this — copy and send it to anyone:
 
