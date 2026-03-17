@@ -151,6 +151,8 @@ mmclaw config -w ~/.mmclaw_work    # configure a specific workspace
 
 The workspace directory is created automatically on first run. We recommend naming it `~/.mmclaw_<label>` (e.g. `~/.mmclaw_work`, `~/.mmclaw_personal`). Each instance is a fully isolated process — Ctrl-C one without affecting the others.
 
+Common use cases: multiple Telegram bots (e.g. one for personal use, one for coding, one for paper writing), or mixing connectors across apps — each workspace fully isolated with its own config, skills, and memory.
+
 ---
 
 ## 🤝 ClawMeets: Get Started
