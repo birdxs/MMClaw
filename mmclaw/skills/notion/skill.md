@@ -13,7 +13,7 @@ Use the Notion API to create/read/update pages, databases, and blocks.
 ## Config File
 
 ```
-~/.mmclaw/skill-config/notion.json
+$MMCLAW_WORKSPACE/skill-config/notion.json
 ```
 
 ```json
@@ -35,7 +35,7 @@ Use the Notion API to create/read/update pages, databases, and blocks.
 **Before any API call**, run this check:
 
 ```bash
-CONFIG_FILE="$HOME/.mmclaw/skill-config/notion.json"
+CONFIG_FILE="${MMCLAW_WORKSPACE:-$HOME/.mmclaw}/skill-config/notion.json"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "NOT_CONFIGURED"
@@ -60,7 +60,7 @@ fi
 
 > ⚠️ Notion is not configured.
 >
-> Please create `~/.mmclaw/skill-config/notion.json`:
+> Please create `$MMCLAW_WORKSPACE/skill-config/notion.json`:
 > ```json
 > {
 >   "auth": {
@@ -91,7 +91,7 @@ fi
 
 > ⚠️ Notion API key looks invalid.
 >
-> The key in `~/.mmclaw/skill-config/notion.json` should start with `ntn_` or `secret_`.
+> The key in `$MMCLAW_WORKSPACE/skill-config/notion.json` should start with `ntn_` or `secret_`.
 
 **If `NO_DEFAULT_DB`**, do NOT ask the user for a UUID and do NOT loop asking for the name repeatedly. Instead:
 
@@ -122,7 +122,7 @@ print(match)
 ```bash
 python3 << 'EOF'
 import json, os
-path = os.path.expanduser("~/.mmclaw/skill-config/notion.json")
+path = os.environ.get('MMCLAW_WORKSPACE', os.path.expanduser('~/.mmclaw')) + '/skill-config/notion.json'
 with open(path, encoding="utf-8") as f:
     config = json.load(f)
 config.setdefault("defaults", {})["database_name"] = "$DB_NAME"
@@ -145,8 +145,8 @@ EOF
 ## API Basics
 
 ```bash
-NOTION_KEY=$(python3 -c "import json; print(json.load(open('$HOME/.mmclaw/skill-config/notion.json'))['auth']['api_key'])")
-DEFAULT_DB_NAME=$(python3 -c "import json; print(json.load(open('$HOME/.mmclaw/skill-config/notion.json'))['defaults']['database_name'])")
+NOTION_KEY=$(python3 -c "import json; print(json.load(open('${MMCLAW_WORKSPACE:-$HOME/.mmclaw}/skill-config/notion.json'))['auth']['api_key'])")
+DEFAULT_DB_NAME=$(python3 -c "import json; print(json.load(open('${MMCLAW_WORKSPACE:-$HOME/.mmclaw}/skill-config/notion.json'))['defaults']['database_name'])")
 ```
 
 > **Important:** In API version `2025-09-03`, most database operations require a `data_source_id`, not the `database_id`. Always run the Discovery step first when working with a database.

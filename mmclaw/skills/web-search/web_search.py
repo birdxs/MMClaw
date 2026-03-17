@@ -7,7 +7,9 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-CONFIG_FILE = Path.home() / ".mmclaw" / "skill-config" / "web-search.json"
+import os
+_WORKSPACE = Path(os.environ.get("MMCLAW_WORKSPACE", str(Path.home() / ".mmclaw")))
+CONFIG_FILE = _WORKSPACE / "skill-config" / "web-search.json"
 
 
 def load_config():

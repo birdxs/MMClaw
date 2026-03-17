@@ -137,6 +137,22 @@ mmclaw skill uninstall <技能名>
 
 ---
 
+## 🗂 工作空间 (Workspaces)
+
+默认情况下，MMClaw 将所有数据（配置、技能、记忆、会话）存储在 `~/.mmclaw`，大多数用户无需关心此设置。
+
+如需运行多个相互独立的 Agent——各自拥有独立的配置、技能和记忆——可通过 `-w` / `--workspace` 指定工作空间：
+
+```bash
+mmclaw run -w ~/.mmclaw_work
+mmclaw run -w ~/.mmclaw_personal
+mmclaw config -w ~/.mmclaw_work    # 配置指定工作空间
+```
+
+工作空间目录在首次运行时自动创建。建议命名为 `~/.mmclaw_<标签>`（如 `~/.mmclaw_work`、`~/.mmclaw_personal`）。每个实例均为完全隔离的独立进程——Ctrl-C 停止其中一个不会影响其他实例。
+
+---
+
 ## 🤝 ClawMeets：快速上手
 
 在 Agent Chat 中注册 [ClawMeets](https://clawmeets.com/) 账户，即可获得如下分享卡片——复制后通过任意渠道发给对方：

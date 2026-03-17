@@ -18,7 +18,7 @@ Do NOT trigger this skill proactively. Only search when the user clearly request
 
 All operations use:
 ```
-python ~/.mmclaw/skills/web-search/web_search.py <command> [args]
+python $MMCLAW_WORKSPACE/skills/web-search/web_search.py <command> [args]
 ```
 
 ## Preconditions
@@ -34,7 +34,7 @@ Run `status` first. Handle output codes:
 | JSON with `"configured": true` | Ready — proceed with search |
 
 ```
-python ~/.mmclaw/skills/web-search/web_search.py status
+python $MMCLAW_WORKSPACE/skills/web-search/web_search.py status
 ```
 
 ---
@@ -43,12 +43,12 @@ python ~/.mmclaw/skills/web-search/web_search.py status
 
 ### Check Status
 ```
-python ~/.mmclaw/skills/web-search/web_search.py status
+python $MMCLAW_WORKSPACE/skills/web-search/web_search.py status
 ```
 
 ### Search
 ```
-python ~/.mmclaw/skills/web-search/web_search.py search "<query>" [--count N] [--depth <depth>] [--topic <topic>] [--time-range <range>] [--include-domains <domains>] [--exclude-domains <domains>] [--raw-content]
+python $MMCLAW_WORKSPACE/skills/web-search/web_search.py search "<query>" [--count N] [--depth <depth>] [--topic <topic>] [--time-range <range>] [--include-domains <domains>] [--exclude-domains <domains>] [--raw-content]
 ```
 Returns a JSON array of `{title, url, snippet}` objects (Tavily also includes `score` and optionally `raw_content`). Default count: 5.
 
@@ -73,7 +73,7 @@ Returns a JSON array of `{title, url, snippet}` objects (Tavily also includes `s
 
 ### Setup (save provider + API key)
 ```
-python ~/.mmclaw/skills/web-search/web_search.py setup <provider> <api_key>
+python $MMCLAW_WORKSPACE/skills/web-search/web_search.py setup <provider> <api_key>
 ```
 `provider` must be one of: `tavily`, `serper`, `serpapi`, `brave`.
 
@@ -104,7 +104,7 @@ If not configured, show this list and ask the user to choose. Translate descript
 
 Once the user chooses a provider and shares their API key, run:
 ```
-python ~/.mmclaw/skills/web-search/web_search.py setup <provider> <api_key>
+python $MMCLAW_WORKSPACE/skills/web-search/web_search.py setup <provider> <api_key>
 ```
 
 ---

@@ -8,7 +8,9 @@ from pathlib import Path
 import traceback
 from mmclaw.watcher import notify
 
-CONFIG_FILE = Path.home() / ".mmclaw" / "skill-config" / "clawmeets.json"
+import os
+_WORKSPACE = Path(os.environ.get("MMCLAW_WORKSPACE", str(Path.home() / ".mmclaw")))
+CONFIG_FILE = _WORKSPACE / "skill-config" / "clawmeets.json"
 TMP_DIR     = Path(tempfile.gettempdir()) / "mmclaw-clawmeets"
 SERVER      = "https://testapi.clawmeets.com"
 INTERVAL    = 2  # seconds between checks

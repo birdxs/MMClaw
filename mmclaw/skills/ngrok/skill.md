@@ -21,7 +21,7 @@ pip install ngrok
 
 ## Configuration
 
-The authtoken is stored at `~/.mmclaw/skill-config/ngrok.json`:
+The authtoken is stored at `$MMCLAW_WORKSPACE/skill-config/ngrok.json`:
 
 ```json
 {
@@ -38,7 +38,7 @@ Ask the user for their authtoken, then create the file:
 ```python
 import json, os
 config = {"authtoken": "<token_provided_by_user>"}
-path = os.path.expanduser("~/.mmclaw/skill-config/ngrok.json")
+path = os.environ.get('MMCLAW_WORKSPACE', os.path.expanduser('~/.mmclaw')) + '/skill-config/ngrok.json'
 os.makedirs(os.path.dirname(path), exist_ok=True)
 with open(path, "w") as f:
     json.dump(config, f, indent=2)
@@ -54,8 +54,9 @@ Use the `shell_async` tool for this command to ensure it runs in the background 
 ```bash
 python -c "
 import ngrok, json, os, threading
-config = json.load(open(os.path.expanduser('~/.mmclaw/skill-config/ngrok.json')))
-url_path = os.path.expanduser('~/.mmclaw/skill-config/ngrok_url.txt')
+_ws = os.environ.get('MMCLAW_WORKSPACE', os.path.expanduser('~/.mmclaw'))
+config = json.load(open(_ws + '/skill-config/ngrok.json'))
+url_path = _ws + '/skill-config/ngrok_url.txt'
 listener = ngrok.forward(<PORT>, authtoken=config['authtoken'])
 open(url_path, 'w').write(listener.url())
 threading.Event().wait()
@@ -65,7 +66,7 @@ threading.Event().wait()
 ### Step 2 — Read and report the URL
 
 ```bash
-sleep 2 && cat ~/.mmclaw/skill-config/ngrok_url.txt
+sleep 2 && cat $MMCLAW_WORKSPACE/skill-config/ngrok_url.txt
 ```
 
 ## IMPORTANT — always report the URL

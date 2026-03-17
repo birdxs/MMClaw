@@ -23,6 +23,31 @@ def _find_file_icase(directory: Path, name: str):
     return None
 
 
+def set_workspace(path: Path):
+    """Override the default workspace directory. Must be called before any config/skill access."""
+    path = path.expanduser().resolve()
+    SkillManager.HOME_DIR = path
+    SkillManager.HOME_SKILLS_DIR = path / "skills"
+    SkillManager.HOME_KG_DIR = path / "skill-kg"
+    SkillManager.HOME_KG_MAIN = path / "skill-kg" / "skill-kg-main.md"
+    SkillManager.HOME_KG_USER = path / "skill-kg" / "skill-kg-user.md"
+    ConfigManager.CONFIG_DIR = path
+    ConfigManager.CONFIG_FILE = path / "mmclaw.json"
+    # Patch other modules (late imports are safe — all modules are loaded before main() calls this)
+    from .memory import FileMemory
+    FileMemory.SESSIONS_DIR = str(path / "memory" / "sessions")
+    FileMemory.GLOBAL_MEMORY_FILE = str(path / "memory" / "global" / "memory.jsonl")
+    from .kernel import HeartbeatManager
+    HeartbeatManager.HEARTBEAT_DIR = path / "heartbeat"
+    HeartbeatManager.CONFIG_FILE = path / "heartbeat" / "heartbeat-config.json"
+    HeartbeatManager.LOG_FILE = path / "heartbeat" / "heartbeat-log.jsonl"
+    HeartbeatManager.SKILLS_DIR = path / "skills"
+    from .watcher import WatcherManager
+    WatcherManager.SKILLS_DIR = path / "skills"
+    from .tools import BrowserTool
+    BrowserTool.DEFAULT_DATA_DIR = str(path / "browser_data")
+
+
 class SkillManager(object):
     HOME_DIR = Path.home() / ".mmclaw"
     HOME_SKILLS_DIR = Path.home() / ".mmclaw" / "skills"
@@ -452,6 +477,15 @@ class ConfigManager(object):
             "IMPORTANT: When running Python scripts, use 'python' — never 'python3' or '/usr/bin/python'.\n"
         )
 
+        workspace_context = (
+            f"\n\n[MMCLAW_WORKSPACE]\n"
+            f"Your MMClaw workspace directory is: {cls.CONFIG_DIR}\n"
+            "Use this path for all file operations, skill scripts, and config files. "
+            "Do NOT use ~/.mmclaw or any other hardcoded path.\n"
+            "In shell commands, reference it as $MMCLAW_WORKSPACE (Linux/macOS) "
+            "or %MMCLAW_WORKSPACE% / $env:MMCLAW_WORKSPACE (Windows cmd/PowerShell).\n"
+        )
+
         # print("================\n" + os_context)
 
-        return cls.BASE_SYSTEM_PROMPT + os_context + browser_context + interface_context + SkillManager.get_skills_prompt() + SkillManager.get_skill_kg_prompt()
+        return cls.BASE_SYSTEM_PROMPT + os_context + workspace_context + browser_context + interface_context + SkillManager.get_skills_prompt() + SkillManager.get_skill_kg_prompt()

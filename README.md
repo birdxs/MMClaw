@@ -137,6 +137,22 @@ You can also just ask your agent to install a skill via chat (Telegram, WhatsApp
 
 ---
 
+## 🗂 Workspaces
+
+By default, MMClaw stores all data (config, skills, memory, sessions) in `~/.mmclaw`. Most users never need to change this.
+
+To run multiple independent agents — each with its own config, skills, and memory — pass `-w` / `--workspace`:
+
+```bash
+mmclaw run -w ~/.mmclaw_work
+mmclaw run -w ~/.mmclaw_personal
+mmclaw config -w ~/.mmclaw_work    # configure a specific workspace
+```
+
+The workspace directory is created automatically on first run. We recommend naming it `~/.mmclaw_<label>` (e.g. `~/.mmclaw_work`, `~/.mmclaw_personal`). Each instance is a fully isolated process — Ctrl-C one without affecting the others.
+
+---
+
 ## 🤝 ClawMeets: Get Started
 
 Sign up for a [ClawMeets](https://clawmeets.com/) account via Agent Chat and get a share card like this — copy and send it to anyone:

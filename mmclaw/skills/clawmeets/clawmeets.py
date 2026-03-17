@@ -11,7 +11,9 @@ import tempfile
 from pathlib import Path
 
 SERVER      = "https://testapi.clawmeets.com"
-CONFIG_FILE = Path.home() / ".mmclaw" / "skill-config" / "clawmeets.json"
+import os
+_WORKSPACE = Path(os.environ.get("MMCLAW_WORKSPACE", str(Path.home() / ".mmclaw")))
+CONFIG_FILE = _WORKSPACE / "skill-config" / "clawmeets.json"
 TMP_DIR     = Path(tempfile.gettempdir()) / "mmclaw-clawmeets"
 
 

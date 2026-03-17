@@ -15,9 +15,9 @@ Trigger phrases: "create a skill", "add a new skill", "make a skill for", "teach
 
 Skills MUST follow this exact structure to be detected:
 
-- **Root Path**: `~/.mmclaw/skills/`
-- **Skill Directory**: `~/.mmclaw/skills/<skill-name>/`
-- **Main File**: `~/.mmclaw/skills/<skill-name>/skill.md`
+- **Root Path**: `$MMCLAW_WORKSPACE/skills/`
+- **Skill Directory**: `$MMCLAW_WORKSPACE/skills/<skill-name>/`
+- **Main File**: `$MMCLAW_WORKSPACE/skills/<skill-name>/skill.md`
 
 ### Naming Rules:
 - **Directory Name**: Use lowercase kebab-case (e.g., `google-search`, `docker-manager`).
@@ -59,7 +59,7 @@ After the header, the `skill.md` should be a well-structured Markdown document c
 ## 4. Workflow for Creating a Skill
 
 1.  **Research**: If the skill is for a CLI tool, run `--help` or check docs to understand its syntax.
-2.  **Create Directory**: `mkdir -p ~/.mmclaw/skills/<name>`
+2.  **Create Directory**: `mkdir -p $MMCLAW_WORKSPACE/skills/<name>`
 3.  **Write `skill.md`**: Create the file with the correct header and detailed instructions.
 4.  **Verify**: Ensure the file is saved.
 5.  **Reload**: Call `shell_execute("ls ~/.mmclaw/skills")` or simply wait for the next turn; MMClaw will automatically detect the update and print `[*] Skill update detected.`

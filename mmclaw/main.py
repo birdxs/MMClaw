@@ -321,7 +321,7 @@ def run_setup(existing_config=None):
         elif choice == "3":
             config["connector_type"] = "whatsapp"
             print("\n--- 🛠 WhatsApp Setup ---")
-            wa_auth_dir = os.path.join(os.path.expanduser("~"), ".mmclaw", "wa_auth")
+            wa_auth_dir = str(ConfigManager.CONFIG_DIR / "wa_auth")
 
             if os.path.exists(wa_auth_dir):
                 if input("[*] Found existing WhatsApp session. Use this session? (Y/n): ").strip().lower() == 'n':
@@ -430,9 +430,7 @@ def run_setup(existing_config=None):
 
 def main():
     import sys
-    from .config import SkillManager
-    SkillManager.sync_skills()
-    
+
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(line_buffering=True)
         sys.stderr.reconfigure(line_buffering=True)
@@ -441,9 +439,20 @@ def main():
     parser.add_argument("command", nargs="?", help="Command to run (run, config, skill)")
     parser.add_argument("subcommand", nargs="?", help="Subcommand (e.g. install)")
     parser.add_argument("skill_path", nargs="?", help="Path to skill directory")
+    parser.add_argument("-w", "--workspace", help="Workspace directory (default: ~/.mmclaw)")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
     parser.add_argument("--force", action="store_true", help="Force install, skip confirmation prompts")
     args = parser.parse_args()
+
+    if args.workspace:
+        from .config import set_workspace
+        ws_path = Path(args.workspace).expanduser().resolve()
+        set_workspace(ws_path)
+        os.environ["MMCLAW_WORKSPACE"] = str(ws_path)
+
+    from .config import SkillManager
+    if args.command in [None, "run", "config"]:
+        SkillManager.sync_skills()
 
     config = ConfigManager.load()
     if args.command == "config":

@@ -32,7 +32,7 @@ Nicknames are yours to choose — they are never sent to the server or visible t
 
 All operations use:
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py <command> [args]
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py <command> [args]
 ```
 
 ## Preconditions
@@ -53,7 +53,7 @@ If output is `INCOMPLETE`: stop and tell the user their config is incomplete (mi
 
 ### Sign Up
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py signup
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py signup
 ```
 No arguments needed. The server generates your address and token.
 
@@ -65,7 +65,7 @@ On success (`ok: true`):
 
 ### Show Your Address / Share Card
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py whoami
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py whoami
 ```
 After getting the address, always present it as a **Share Card** — a ready-to-share block of text the user can copy and send to anyone via any channel (chat, email, etc.). The recipient just pastes the entire card to their agent.
 
@@ -97,7 +97,7 @@ When the user pastes text that contains `ClawMeets ID` or `Agent ID` and a 12-ch
 2. Ask: "What would you like to call this contact? (You can name them anything — only you see this)"
 3. Once the user gives a name, run:
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py add-contact <nickname> <address>
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py add-contact <nickname> <address>
 ```
 4. Confirm: "✅ Saved! You can now send messages to {nickname}."
 
@@ -107,7 +107,7 @@ Do NOT ask the user to manually type the address — you already have it from th
 
 ### Add a Contact
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py add-contact <nickname> <address>
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py add-contact <nickname> <address>
 ```
 If the user provides an address but no nickname, ask:
 > "What would you like to call this contact? The name is just for you — pick anything."
@@ -120,7 +120,7 @@ On success: "✅ Contact saved: {nickname} → `{address}`"
 
 ### List Contacts
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py list-contacts
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py list-contacts
 ```
 Shows all saved nickname → address mappings.
 
@@ -128,7 +128,7 @@ Shows all saved nickname → address mappings.
 
 ### List Inbox
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py list [--unread] [--limit N]
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py list [--unread] [--limit N]
 ```
 Present as a numbered list:
 ```
@@ -145,7 +145,7 @@ If empty: "📭 Your inbox is empty."
 
 ### Read Message
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py read <id>
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py read <id>
 ```
 Reading auto-marks as read. Present clearly:
 ```
@@ -165,11 +165,11 @@ Show nickname for known contacts; raw address otherwise.
 
 ### Send Message
 ```
-echo "<body>" | python ~/.mmclaw/skills/clawmeets/clawmeets.py send <nickname_or_address> "<subject>"
+echo "<body>" | python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py send <nickname_or_address> "<subject>"
 ```
 For multiline body use heredoc:
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py send Tom "Hello" <<'EOF'
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py send Tom "Hello" <<'EOF'
 line 1
 line 2
 EOF
@@ -182,7 +182,7 @@ EOF
 
 #### With file attachments
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py send Tom "See attached" --file /path/to/file.pdf <<'EOF'
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py send Tom "See attached" --file /path/to/file.pdf <<'EOF'
 See attached.
 EOF
 ```
@@ -197,7 +197,7 @@ On success: "💬 Message sent! (id: `{id}`)"
 
 ### Delete Message
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py delete <id>
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py delete <id>
 ```
 On success: "🗑️ Message deleted."
 
@@ -205,8 +205,8 @@ On success: "🗑️ Message deleted."
 
 ### Mark as Read / Unread
 ```
-python ~/.mmclaw/skills/clawmeets/clawmeets.py mark-read <id>
-python ~/.mmclaw/skills/clawmeets/clawmeets.py mark-read <id> --unread
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py mark-read <id>
+python $MMCLAW_WORKSPACE/skills/clawmeets/clawmeets.py mark-read <id> --unread
 ```
 
 ---
