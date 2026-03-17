@@ -449,6 +449,9 @@ def main():
         ws_path = Path(args.workspace).expanduser().resolve()
         set_workspace(ws_path)
         os.environ["MMCLAW_WORKSPACE"] = str(ws_path)
+        print(f"[*] Workspace: {ws_path}")
+    else:
+        print(f"[*] Workspace: default (~/.mmclaw)  |  use -w <path> to specify a different workspace")
 
     from .config import SkillManager
     if args.command in [None, "run", "config"]:
