@@ -21,10 +21,10 @@ class StopRequested(Exception):
 
 
 class HeartbeatManager:
-    HEARTBEAT_DIR = Path.home() / ".mmclaw" / "heartbeat"
-    CONFIG_FILE   = Path.home() / ".mmclaw" / "heartbeat" / "heartbeat-config.json"
-    LOG_FILE      = Path.home() / ".mmclaw" / "heartbeat" / "heartbeat-log.jsonl"
-    SKILLS_DIR    = Path.home() / ".mmclaw" / "skills"
+    HEARTBEAT_DIR = None
+    CONFIG_FILE   = None
+    LOG_FILE      = None
+    SKILLS_DIR    = None
 
     def __init__(self, task_queue: queue.Queue, connector):
         self.task_queue = task_queue
@@ -177,6 +177,128 @@ class HeartbeatManager:
             time.sleep(interval_secs)
 
 
+class CronManager:
+    CRON_DIR  = None
+    JOBS_FILE = None
+
+    def __init__(self, cron_queue: queue.Queue):
+        self.cron_queue = cron_queue
+        self._scheduler = None
+
+    def start(self):
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+        except ImportError:
+            print("[!] CronManager: apscheduler not installed. Run: pip install apscheduler")
+            return
+        self.CRON_DIR.mkdir(parents=True, exist_ok=True)
+        self._scheduler = BackgroundScheduler()
+        self._scheduler.start()
+        jobs = self._load_jobs()
+        for job in jobs:
+            self._schedule_job(job)
+        print(f"[*] CronManager: started with {len(jobs)} job(s)")
+
+    def _load_jobs(self) -> list:
+        if not self.JOBS_FILE.exists():
+            return []
+        jobs = []
+        try:
+            for line in self.JOBS_FILE.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    jobs.append(json.loads(line))
+        except Exception as e:
+            print(f"[!] CronManager: failed to load jobs: {e}")
+        return jobs
+
+    def _save_jobs(self, jobs: list):
+        self.CRON_DIR.mkdir(parents=True, exist_ok=True)
+        with open(self.JOBS_FILE, "w", encoding="utf-8") as f:
+            for job in jobs:
+                f.write(json.dumps(job, ensure_ascii=False) + "\n")
+
+    def _make_trigger(self, cron: str):
+        from apscheduler.triggers.cron import CronTrigger
+        fields = cron.strip().split()
+        if len(fields) == 5:
+            return CronTrigger.from_crontab(cron)
+        elif len(fields) == 6:
+            s, mi, h, d, mo, dow = fields
+            return CronTrigger(second=s, minute=mi, hour=h, day=d, month=mo, day_of_week=dow)
+        else:
+            raise ValueError(f"Expected 5 or 6 fields, got {len(fields)}")
+
+    def _schedule_job(self, job: dict):
+        if self._scheduler is None:
+            return
+        name = job["name"]
+        try:
+            trigger = self._make_trigger(job["cron"])
+            self._scheduler.add_job(
+                self._fire,
+                trigger=trigger,
+                args=[name, job["prompt"]],
+                id=name,
+                replace_existing=True,
+            )
+        except Exception as e:
+            print(f"[!] CronManager: failed to schedule '{name}': {e}")
+
+    def _fire(self, name: str, prompt: str):
+        self.cron_queue.put(f"[CRON: {name}]\n{prompt}")
+        print(f"[*] CronManager: fired '{name}'")
+
+    def create(self, name: str, cron: str, prompt: str) -> str:
+        if self._scheduler is None:
+            return "Error: CronManager not started (apscheduler missing)."
+        try:
+            self._make_trigger(cron)
+        except Exception as e:
+            return f"Error: invalid cron expression '{cron}': {e}"
+        jobs = self._load_jobs()
+        if any(j["name"] == name for j in jobs):
+            return f"Error: job '{name}' already exists. Delete it first."
+        job = {
+            "name": name,
+            "cron": cron,
+            "prompt": prompt,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        jobs.append(job)
+        self._save_jobs(jobs)
+        self._schedule_job(job)
+        return f"Cron job '{name}' created ({cron})."
+
+    def delete(self, indices) -> str:
+        if isinstance(indices, int):
+            indices = [indices]
+        else:
+            indices = [int(i) for i in indices]
+        jobs = self._load_jobs()
+        invalid = [i for i in indices if i < 0 or i >= len(jobs)]
+        if invalid:
+            return f"Error: indices {invalid} out of range (0-{len(jobs)-1})."
+        to_remove = [jobs[i]["name"] for i in indices]
+        new_jobs = [j for i, j in enumerate(jobs) if i not in set(indices)]
+        self._save_jobs(new_jobs)
+        if self._scheduler:
+            for name in to_remove:
+                try:
+                    self._scheduler.remove_job(name)
+                except Exception:
+                    pass
+        remaining = "\n".join(f"[{i}] {j['name']} | {j['cron']} | {j['prompt']}" for i, j in enumerate(new_jobs))
+        return f"Deleted {len(indices)} job(s). Remaining:\n{remaining or '(none)'}"
+
+    def list_jobs(self) -> str:
+        jobs = self._load_jobs()
+        if not jobs:
+            return "No cron jobs."
+        lines = [f"[{i}] ({j['name']}) {j['cron']} — {j['prompt']}" for i, j in enumerate(jobs)]
+        return "\n".join(lines)
+
+
 class MMClaw(object):
     def __init__(self, config, connector, system_prompt):
         self.config = config
@@ -186,13 +308,18 @@ class MMClaw(object):
         self.connector.file_saver = self.memory.save_file
         self.chat_queue = queue.Queue()
         self.heartbeat_queue = queue.Queue()
+        self.cron_queue = queue.Queue()
         self.debug = config.get("debug", False)
 
-        threading.Thread(target=self._worker, args=(self.chat_queue, False), daemon=True).start()
-        threading.Thread(target=self._worker, args=(self.heartbeat_queue, True), daemon=True).start()
+        threading.Thread(target=self._worker, args=(self.chat_queue, "chat"), daemon=True).start()
+        threading.Thread(target=self._worker, args=(self.heartbeat_queue, "heartbeat"), daemon=True).start()
+        threading.Thread(target=self._worker, args=(self.cron_queue, "cron"), daemon=True).start()
 
         self.heartbeat = HeartbeatManager(self.heartbeat_queue, self.connector)
         self.heartbeat.start()
+
+        self.cron = CronManager(self.cron_queue)
+        self.cron.start()
 
         self.watcher = WatcherManager(self.chat_queue)
         self.watcher.start()
@@ -317,18 +444,23 @@ class MMClaw(object):
             return None
         return None
 
-    def _worker(self, q: queue.Queue, is_heartbeat: bool):
+    def _worker(self, q: queue.Queue, mode: str):
         while True:
             user_text = q.get()
             if user_text is None:
                 break
 
-            if is_heartbeat:
+            is_background = mode != "chat"
+
+            if mode == "heartbeat":
                 silent_tools   = True
                 silent_content = user_text.startswith("[HEARTBEAT_DISCOVER:")
                 history = [{"role": "user", "content": user_text}]
-            else:
-                # Reset the stop flag at the start of every new chat task
+            elif mode == "cron":
+                silent_tools   = True
+                silent_content = False
+                history = [{"role": "user", "content": user_text}]
+            else:  # chat
                 self._stop_event.clear()
                 silent_tools   = user_text.startswith("[WATCHER:")
                 silent_content = False
@@ -337,7 +469,7 @@ class MMClaw(object):
             self.connector.start_typing()
             try:
                 while True:
-                    if not is_heartbeat:
+                    if not is_background:
                         self._check_stop()
 
                     # Refresh system prompt before every call to pick up new skills or context changes
@@ -345,15 +477,15 @@ class MMClaw(object):
                     new_prompt = ConfigManager.get_full_prompt(mode=self.connector.__class__.__name__.lower().replace("connector", ""))
                     self.memory.update_system_prompt(new_prompt)
 
-                    ask_messages = [self.memory.get_all()[0]] + history if is_heartbeat else self.memory.get_all()
+                    ask_messages = [self.memory.get_all()[0]] + history if is_background else self.memory.get_all()
 
-                    if is_heartbeat:
+                    if is_background:
                         response_msg = self.engine.ask(ask_messages)
                     else:
                         response_msg = self._ask_with_stop(ask_messages)
                     raw_text = response_msg.get("content", "")
 
-                    if is_heartbeat:
+                    if is_background:
                         history.append({"role": "assistant", "content": raw_text})
                     else:
                         self.memory.add("assistant", raw_text)
@@ -381,7 +513,7 @@ class MMClaw(object):
 
                     session_reset = False
                     for tool in tools:
-                        if not is_heartbeat:
+                        if not is_background:
                             self._check_stop()
 
                         name = tool.get("name")
@@ -394,7 +526,7 @@ class MMClaw(object):
                         result = ""
                         if name == "shell_execute":
                             if not silent_tools:self.connector.send(f"🐚 Shell: `{args.get('command')}`")
-                            if is_heartbeat:
+                            if is_background:
                                 result = ShellTool.execute(args.get("command"))
                             else:
                                 result = self._shell_execute_with_stop(args.get("command"))
@@ -413,7 +545,7 @@ class MMClaw(object):
                             result = f"File {args.get('path')} sent."
                         elif name == "wait":
                             if not silent_tools:self.connector.send(f"⏳ Waiting {args.get('seconds')}s...")
-                            if is_heartbeat:
+                            if is_background:
                                 result = TimerTool.wait(args.get("seconds"))
                             else:
                                 result = self._wait_with_stop(args.get("seconds"))
@@ -461,6 +593,20 @@ class MMClaw(object):
                             result = BrowserTool.screenshot(args.get("path"))
                             if result.startswith("OK:"):
                                 if not silent_tools:self.connector.send_file(result[4:].strip())
+                        elif name == "cron_create":
+                            if not silent_tools:self.connector.send(f"⏰ Cron create: `{args.get('name')}`")
+                            result = self.cron.create(args.get("name"), args.get("cron"), args.get("prompt"))
+                        elif name == "cron_delete":
+                            indices = args.get("indices", args.get("index", -1))
+                            if isinstance(indices, list):
+                                indices = [int(i) for i in indices]
+                            else:
+                                indices = int(indices)
+                            if not silent_tools:self.connector.send(f"⏰ Cron delete: {indices}")
+                            result = self.cron.delete(indices)
+                        elif name == "cron_list":
+                            if not silent_tools:self.connector.send("⏰ Listing cron jobs...")
+                            result = self.cron.list_jobs()
                         elif name == "upgrade":
                             if not silent_tools:self.connector.send("⬆️ Upgrading MMClaw... (this is tricky — there's no notification when it's done. Please wait a moment, then ask me for my version number to confirm the upgrade succeeded.)")
                             result = UpgradeTool.upgrade()  # restarts process on success; only returns on failure
@@ -469,7 +615,7 @@ class MMClaw(object):
                         if self.debug:
                             print(f"\n    [Tool Output: {name}]\n    {result}\n")
                         tool_output = f"Tool Output ({name}):\n{result}"
-                        if is_heartbeat:
+                        if is_background:
                             history.append({"role": "user", "content": tool_output})
                         else:
                             self.memory.add("user", tool_output)

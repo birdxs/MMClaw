@@ -37,11 +37,13 @@ def set_workspace(path: Path):
     from .memory import FileMemory
     FileMemory.SESSIONS_DIR = str(path / "memory" / "sessions")
     FileMemory.GLOBAL_MEMORY_FILE = str(path / "memory" / "global" / "memory.jsonl")
-    from .kernel import HeartbeatManager
+    from .kernel import HeartbeatManager, CronManager
     HeartbeatManager.HEARTBEAT_DIR = path / "heartbeat"
     HeartbeatManager.CONFIG_FILE = path / "heartbeat" / "heartbeat-config.json"
     HeartbeatManager.LOG_FILE = path / "heartbeat" / "heartbeat-log.jsonl"
     HeartbeatManager.SKILLS_DIR = path / "skills"
+    CronManager.CRON_DIR  = path / "cron"
+    CronManager.JOBS_FILE = path / "cron" / "cron-jobs.jsonl"
     from .watcher import WatcherManager
     WatcherManager.SKILLS_DIR = path / "skills"
     from .tools import BrowserTool
@@ -248,6 +250,20 @@ class ConfigManager(object):
         "If a message starts with [HEARTBEAT_DISCOVER: skill_name], a new skill with a heartbeat was found. "
         "Read the instructions, choose a sensible interval_seconds (minimum 10), update the heartbeat-config.json file. "
         "Set \"content\" to \"\" in every response. Do NOT send any message to the user.\n"
+        "[CRON JOBS]\n"
+        "If a message starts with [CRON: job_name], it is a scheduled cron trigger — not from the user. "
+        "Follow the instructions inside the message. "
+        "Only set a non-empty \"content\" in the FINAL response when there is a meaningful conclusion to report — skip intermediate steps. "
+        "When you do output content, prefix it with ⏰ so the user knows it is a scheduled task.\n"
+        "Cron tools:\n"
+        "- cron_create(name, cron, prompt): Create a cron job. 'name' is a short identifier. "
+        "'cron' supports two formats: "
+        "5-field (minute-level): 'minute hour day month weekday' (e.g. '*/30 * * * *' for every 30 min, '0 9 * * 1-5' for weekdays at 9am); "
+        "6-field (second-level): 'second minute hour day month weekday' (e.g. '*/10 * * * * *' for every 10 seconds). "
+        "Convert the user's natural language schedule to the appropriate cron expression. "
+        "'prompt' is the instruction to execute each time the job fires.\n"
+        "- cron_delete(indices): Delete one or more cron jobs by index. Pass a single int or a list of ints (e.g. [0, 2]). Indices are based on cron_list output. Always pass all indices in one call to avoid index shifting.\n"
+        "- cron_list(): List all active cron jobs with their indices.\n\n"
         "If a message starts with [WATCHER: skill_name], it is an event notification from a background watcher — not from the user. "
         "If you have not already read the full instructions for that skill during this session, you MUST use file_read() to read the skill's path (found in the SKILLS SECTION) before taking any action. "
         "IMPORTANT: If the notification provides information that should be shown to the user (like an incoming message or alert), you MUST show that information in your FIRST response via the \"content\" field. "

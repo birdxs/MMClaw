@@ -14,7 +14,7 @@ def notify(message: str):
 
 
 class WatcherManager:
-    SKILLS_DIR = Path.home() / ".mmclaw" / "skills"
+    SKILLS_DIR = None
 
     def __init__(self, chat_queue):
         self.chat_queue = chat_queue

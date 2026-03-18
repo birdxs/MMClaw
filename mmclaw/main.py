@@ -444,14 +444,15 @@ def main():
     parser.add_argument("--force", action="store_true", help="Force install, skip confirmation prompts")
     args = parser.parse_args()
 
+    from .config import set_workspace
     if args.workspace:
-        from .config import set_workspace
         ws_path = Path(args.workspace).expanduser().resolve()
-        set_workspace(ws_path)
-        os.environ["MMCLAW_WORKSPACE"] = str(ws_path)
         print(f"[*] Workspace: {ws_path}")
     else:
+        ws_path = Path.home() / ".mmclaw"
         print(f"[*] Workspace: default (~/.mmclaw)  |  use -w <path> to specify a different workspace")
+    set_workspace(ws_path)
+    os.environ["MMCLAW_WORKSPACE"] = str(ws_path)
 
     from .config import SkillManager
     if args.command in [None, "run", "config"]:

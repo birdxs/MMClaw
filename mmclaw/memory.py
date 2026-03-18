@@ -40,8 +40,8 @@ class BaseMemory(object):
 
 
 class FileMemory(BaseMemory):
-    SESSIONS_DIR = os.path.join(os.path.expanduser("~"), ".mmclaw", "memory", "sessions")
-    GLOBAL_MEMORY_FILE = os.path.join(os.path.expanduser("~"), ".mmclaw", "memory", "global", "memory.jsonl")
+    SESSIONS_DIR = None
+    GLOBAL_MEMORY_FILE = None
 
     def __init__(self, system_prompt):
         os.makedirs(self.SESSIONS_DIR, exist_ok=True)
