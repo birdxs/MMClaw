@@ -2,7 +2,7 @@
 name: clawhub
 description: Browse, search, and install skills from the CrawHub skill marketplace.
 metadata:
-  { "mmclaw": { "emoji": "🏪", "os": ["darwin", "linux", "windows"] } }
+  { "mmclaw": { "emoji": "🏪", "os": ["linux", "darwin", "win32"] } }
 ---
 # CrawHub Skill Marketplace
 
@@ -14,7 +14,15 @@ Browse and install community skills from CrawHub.
 - User asks what skills are available
 - User wants to update or reinstall an existing skill
 
-## URLs
+## Searching CrawHub
+
+Use the **web-search skill** to search CrawHub for skills. Search queries should target `clawhub.ai`:
+
+```
+site:clawhub.ai <keyword>
+```
+
+As a fallback, construct these URLs to share with the user:
 
 ### Browse all skills (sorted by downloads)
 ```
@@ -25,7 +33,6 @@ https://clawhub.ai/skills?sort=downloads&nonSuspicious=true
 ```
 https://clawhub.ai/skills?nonSuspicious=true&q=KEYWORD
 ```
-When the user provides a skill name, construct the search URL with their keyword and show it as the primary option. Also show the browse URL as a fallback if the search doesn't return the right result.
 
 > ⚠️ Do NOT curl/fetch CrawHub pages unless the user explicitly asks — the site has rate limits.
 
@@ -33,33 +40,38 @@ When the user provides a skill name, construct the search URL with their keyword
 
 Since users on mobile connectors can't run terminal commands directly:
 
-1. Construct the search URL with the user's keyword and send it as the primary link. Also mention the browse URL as a fallback if the result isn't what they want.
-2. Ask them to open the search URL, find the skill, and click into it
+1. Use the web-search skill to search `site:clawhub.ai <keyword>` and share the result URLs. Also mention the browse URL as a fallback if the search doesn't return the right result.
+2. Ask them to open the skill page and click into it
 3. On the skill page: **right-click the "Download Zip" button → "Copy Link"**
 4. Ask them to paste the copied link back into the chat
 
-Then install it:
-```bash
-mmclaw skill install <pasted-url>
+Then install it (replace `<workspace>` per the OS note in Local Commands):
+```
+mmclaw -w <workspace> skill install <pasted-url>
 ```
 
 If you get `already exists. Use --force to replace it.`, ask the user:
 > "Skill X already exists. Replace it?"
-- User says yes → run `mmclaw skill install --force <pasted-url>`
+- User says yes → run `mmclaw -w <workspace> skill install --force <pasted-url>`
 - User says no → abort
 
 ## Local Commands
 
-```bash
+The workspace path comes from your `[MMCLAW_WORKSPACE]` context. Replace `<workspace>` with the actual path using the OS-appropriate variable:
+- Linux/macOS: `$MMCLAW_WORKSPACE`
+- Windows cmd: `%MMCLAW_WORKSPACE%`
+- Windows PowerShell: `$env:MMCLAW_WORKSPACE`
+
+```
 # List installed skills
-mmclaw skill list
+mmclaw -w <workspace> skill list
 
 # Install from URL — always try without --force first
-mmclaw skill install <url>
+mmclaw -w <workspace> skill install <url>
 
 # Install from local directory
-mmclaw skill install /path/to/skill-dir
+mmclaw -w <workspace> skill install /path/to/skill-dir
 
 # Uninstall
-mmclaw skill uninstall <skill-name>
+mmclaw -w <workspace> skill uninstall <skill-name>
 ```
