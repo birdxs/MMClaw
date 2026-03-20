@@ -3,6 +3,8 @@ import traceback
 import queue
 import json
 import re
+
+JSON_PARSE_RETRIES = 1
 import time
 import subprocess
 import random
@@ -468,6 +470,7 @@ class MMClaw(object):
 
             self.connector.start_typing()
             try:
+                json_retries_left = JSON_PARSE_RETRIES
                 while True:
                     if not is_background:
                         self._check_stop()
@@ -493,6 +496,14 @@ class MMClaw(object):
                     data = self._extract_json(raw_text)
                     # print(f"[D] data={repr(data)}")
                     if not data:
+                        if json_retries_left > 0:
+                            json_retries_left -= 1
+                            correction = "Your response was not valid JSON. Please respond with valid JSON only."
+                            if is_background:
+                                history.append({"role": "user", "content": correction})
+                            else:
+                                self.memory.add("user", correction)
+                            continue
                         if not silent_content:
                             self.connector.send(raw_text)
                         break

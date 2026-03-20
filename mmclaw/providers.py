@@ -3,6 +3,7 @@ import urllib.request
 import urllib.error
 import base64
 import io
+import time
 
 try:
     from PIL import Image as PILImage
@@ -58,6 +59,7 @@ class Engine(object):
         self.model = engine_config["model"]
         self.debug = config.get("debug", False)
         self.account_id = engine_config.get("account_id")
+        self.stream = True  # Set to True externally to test streaming mode
         
         # Correct URL for Codex backend-api
         if self.engine_type == "codex":
@@ -104,7 +106,61 @@ class Engine(object):
             print(f"[!] Codex Refresh Error: {e}")
             return False
 
-    def ask(self, messages, tools=None):
+    def _ask_blocking(self, url, payload):
+        payload = {**payload, "stream": False}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; codex-cli/1.0)"
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            return res_data["choices"][0]["message"]
+
+    def _ask_stream(self, url, payload):
+        payload = {**payload, "stream": True}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; codex-cli/1.0)"
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as response:
+            full_content = ""
+            for line in response:
+                line = line.decode("utf-8").strip()
+                if not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    res_data = json.loads(data_str)
+                    content = res_data["choices"][0]["delta"].get("content")
+                    if content:
+                        full_content += content
+                except:
+                    continue
+            return {"role": "assistant", "content": full_content}
+
+    def ask(self, messages, tools=None, retry=1):
+        last_err = None
+        for attempt in range(retry + 1):
+            try:
+                return self.ask_once(messages, tools=tools)
+            except urllib.error.HTTPError as e:
+                if 400 <= e.code < 500:
+                    raise
+                last_err = e
+            except Exception as e:
+                last_err = e
+            if attempt < retry:
+                print(f"[!] Request failed ({last_err}), retrying...")
+                time.sleep(2)
+        raise last_err
+
+    def ask_once(self, messages, tools=None):
         if self.engine_type in ["openai", "codex", "google", "deepseek", "openrouter", "kimi"] or self.engine_type.startswith("openai_compatible_"):
             if self.engine_type == "codex":
                 # Responses API (Codex)
@@ -132,9 +188,8 @@ class Engine(object):
             else:
                 # ChatCompletions API (standard)
                 payload = {
-                    "model": self.model, 
+                    "model": self.model,
                     "messages": messages,
-                    "stream": False
                 }
                 if tools:
                     payload["tools"] = tools
@@ -174,31 +229,30 @@ class Engine(object):
                 if self.debug:
                     print(f"\n[LLM Request ({self.engine_type})]\n{json.dumps(payload, indent=2)}\n")
                 
-                req = make_request(self.api_key, payload)
-                with urllib.request.urlopen(req, timeout=60) as response:
-                    if self.engine_type == "codex":
+                if self.engine_type == "codex":
+                    req = make_request(self.api_key, payload)
+                    with urllib.request.urlopen(req, timeout=60) as response:
                         full_content = ""
                         for line in response:
                             line = line.decode("utf-8").strip()
                             if not line.startswith("data: "): continue
-                            
+
                             data_str = line[6:]
                             if data_str == "[DONE]": break
                             try:
                                 res_data = json.loads(data_str)
                                 if res_data.get("type") == "response.completed": break
-                                
+
                                 chunk_text = parse_codex_response(res_data)
                                 if chunk_text: full_content += chunk_text
                             except: continue
                         msg = {"role": "assistant", "content": full_content}
-                    else:
-                        res_data = json.loads(response.read().decode("utf-8"))
-                        msg = res_data["choices"][0]["message"]
-                        
-                    if self.debug:
-                        print(f"\n[LLM Response]\n{json.dumps(msg, indent=2)}\n")
-                    return msg
+                else:
+                    msg = self._ask_stream(url, payload) if self.stream else self._ask_blocking(url, payload)
+
+                if self.debug:
+                    print(f"\n[LLM Response]\n{json.dumps(msg, indent=2)}\n")
+                return msg
             except Exception as e:
                 # Handle token expiry for codex
                 if self.engine_type == "codex" and isinstance(e, urllib.error.HTTPError):
