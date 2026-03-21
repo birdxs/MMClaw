@@ -468,6 +468,16 @@ class ConfigManager(object):
                 "for lists (e.g., - or *) and tables. Avoid complex markdown that doesn't render in a shell.\n"
             )
 
+        engine_type = config.get("engine_type", "openai")
+        active_engine = config.get("engines", {}).get(engine_type, {})
+        model_name = active_engine.get("model", "unknown")
+        engine_context = (
+            f"\n\n[LLM ENGINE]\n"
+            f"Provider: {engine_type}\n"
+            f"Model: {model_name}\n"
+            "Use this to answer if the user asks which model, provider, or engine you are running on.\n"
+        )
+
         browser_enabled = config.get("browser", {}).get("enabled", False)
         browser_context = (
             "\n\n[BROWSER]\n"
@@ -482,8 +492,11 @@ class ConfigManager(object):
             "- browser_screenshot(path?): Take a screenshot. Only call this when the user explicitly asks for a screenshot. Never call it proactively.\n"
             if browser_enabled else
             "\n\n[BROWSER]\n"
-            "Status: DISABLED — do not use any browser tools or the browser skill, even if the user asks. "
-            "Inform the user that browser support is not enabled and they can enable it by running 'mmclaw config'.\n"
+            "Status: DISABLED — the browser_start/navigate/click/fill/get_text/screenshot/stop tools are unavailable. Do NOT use the browser skill.\n"
+            "IMPORTANT: Browser being disabled does NOT prevent:\n"
+            "- Fetching and analyzing URL content: use Python with requests + beautifulsoup4 (bs4) for parsing/analysis; for simple plain-text retrieval curl -sL <url> is also fine\n"
+            "- Web search: the web-search skill uses its own search API and does NOT require the browser — use it normally\n"
+            "Only refuse browser-specific interactive tasks (login flows, clicking UI elements, screenshots).\n"
         )
 
         os_context = (
@@ -504,4 +517,4 @@ class ConfigManager(object):
 
         # print("================\n" + os_context)
 
-        return cls.BASE_SYSTEM_PROMPT + os_context + workspace_context + browser_context + interface_context + SkillManager.get_skills_prompt() + SkillManager.get_skill_kg_prompt()
+        return cls.BASE_SYSTEM_PROMPT + os_context + workspace_context + engine_context + browser_context + interface_context + SkillManager.get_skills_prompt() + SkillManager.get_skill_kg_prompt()

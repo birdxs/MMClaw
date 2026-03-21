@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="mmclaw",
-    version="0.0.69",
+    version="0.0.70",
 
     author="Jun Hu",
     author_email="hujunxianligong@gmail.com",
@@ -29,11 +29,13 @@ setup(
         "openai",
         "pyTelegramBotAPI",
         "Pillow",
+        "beautifulsoup4",
 
         "reportlab>=4.0.0",
         "pypdf>=4.0.0",
         "qq-botpy==1.2.1",
         "apscheduler==3.11.2",
+        
     ],
     extras_require={
         "all": [
