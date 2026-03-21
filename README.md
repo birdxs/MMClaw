@@ -181,7 +181,7 @@ When a friend pastes their card to MMClaw, just give them a nickname (local only
 
 ---
 
-## Run Agent via Command-Line Prompt (`-p`)
+## 🖥️ Run Agent via Command-Line Prompt (`-p`)
 
 Run a single prompt non-interactively — the agent executes the full agentic loop (tool calls, multi-step tasks) and exits when done. No session history or global memory — clean context every run. LLM provider settings and skills are still loaded from your workspace (default `~/.mmclaw`, or specify via `-w`).
 
