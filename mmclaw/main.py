@@ -8,7 +8,7 @@ import base64
 import time
 from .config import ConfigManager
 from .kernel import MMClaw
-from .connectors import TelegramConnector, TerminalConnector, WhatsAppConnector, FeishuConnector, QQBotConnector, StatelessArgConnector
+from .connectors import TelegramConnector, TerminalConnector, WhatsAppConnector, FeishuConnector, QQBotConnector, WeChatConnector, StatelessArgConnector
 
 def run_setup(existing_config=None):
     
@@ -273,11 +273,12 @@ def run_setup(existing_config=None):
         print("1. Terminal Mode")
         print("2. Telegram Mode")
         print("3. WhatsApp Mode (Scan QR Code)")
-        print("4. Feishu (飞书) Mode")
-        print("5. QQ Bot (QQ机器人) Mode")
-        choice = input("Select mode (1, 2, 3, 4, or 5) [Keep current]: ").strip()
+        print("4. WeChat (微信) Mode (Scan QR Code)")
+        print("5. Feishu (飞书) Mode")
+        print("6. QQ Bot (QQ机器人) Mode")
+        choice = input("Select mode (1-6) [Keep current]: ").strip()
 
-        if choice == "4":
+        if choice == "5":
             config["connector_type"] = "feishu"
             print("\n--- 🛠 Feishu (飞书) Setup ---")
 
@@ -345,7 +346,7 @@ def run_setup(existing_config=None):
             else:
                 config["connectors"]["whatsapp"]["authorized_id"] = None
                 need_auth = True
-        elif choice == "5":
+        elif choice == "6":
             config["connector_type"] = "qqbot"
             print("\n--- 🛠 QQ Bot (QQ机器人) 配置 ---")
             if "qqbot" not in config["connectors"]:
@@ -367,6 +368,26 @@ def run_setup(existing_config=None):
             input("    完成后请按回车键 continue...")
             print("[✓] 配置完成。无需\"发布上架\"，沙箱模式即可使用。")
             print("    启动后，直接私聊机器人即可交互。")
+        elif choice == "4":
+            config["connector_type"] = "wechat"
+            print("\n--- 🛠 WeChat (微信) Setup ---")
+            if "wechat" not in config["connectors"]:
+                config["connectors"]["wechat"] = {}
+
+            if config["connectors"]["wechat"].get("token"):
+                bound = config["connectors"]["wechat"].get("authorized_id", "")
+                hint = f" (bound user: {bound})" if bound else ""
+                reset = input(f"\n[*] An existing WeChat session was found{hint}. Reset and re-scan QR code? (y/N): ").strip().lower()
+                if reset == 'y':
+                    config["connectors"]["wechat"]["token"] = None
+                    config["connectors"]["wechat"]["authorized_id"] = None
+                    config["connectors"]["wechat"]["get_updates_buf"] = ""
+                    print("[✓] WeChat session cleared.")
+                need_auth = True
+            else:
+                need_auth = True
+
+            print("[✓] WeChat (微信) configured. A QR code will appear on next startup — scan it with WeChat to log in.")
         elif choice == "1":
             config["connector_type"] = "terminal"
 
@@ -578,6 +599,8 @@ def main():
         elif mode == "qqbot":
             qq = connectors_config.get("qqbot", {})
             connector = QQBotConnector(qq.get("app_id"), qq.get("app_secret"), config=config)
+        elif mode == "wechat":
+            connector = WeChatConnector(config=config)
         else: connector = TerminalConnector()
 
     engine_type = config.get("engine_type", "openai")

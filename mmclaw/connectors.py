@@ -704,6 +704,584 @@ class WhatsAppConnector(object):
         except Exception as e:
             print(f"[!] WhatsApp send_file error: {e}")
 
+class WeChatConnector(object):
+    """WeChat (Weixin iLink Bot) connector via QR login + long-poll getUpdates."""
+
+    DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
+    CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c"
+    BOT_TYPE = "3"
+    LONG_POLL_TIMEOUT_S = 38   # slightly longer than server's 35 s hold
+    MAX_CONSECUTIVE_FAILURES = 3
+    CHANNEL_VERSION = "mmclaw"
+    # UploadMediaType
+    _MEDIA_IMAGE = 1
+    _MEDIA_VIDEO = 2
+    _MEDIA_FILE  = 3
+    # MessageItemType
+    _ITEM_TEXT  = 1
+    _ITEM_IMAGE = 2
+    _ITEM_FILE  = 4
+    _ITEM_VIDEO = 5
+
+    def __init__(self, config=None):
+        self.config = config if config else ConfigManager.load()
+        self.wc_config = self.config.get("connectors", {}).get("wechat", {})
+        self.token = self.wc_config.get("token")
+        self.base_url = self.wc_config.get("base_url", self.DEFAULT_BASE_URL).rstrip("/")
+        self.authorized_id = self.wc_config.get("authorized_id")
+        self._get_updates_buf = self.wc_config.get("get_updates_buf", "")
+        self.callback = None
+        self._typing = False
+        self._stop_event = threading.Event()
+        self._context_tokens = {}   # from_user_id -> context_token (in-memory)
+        self.file_saver = None
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _random_wechat_uin(self):
+        import struct
+        uint32 = struct.unpack(">I", os.urandom(4))[0]
+        return base64.b64encode(str(uint32).encode()).decode()
+
+    def _build_headers(self):
+        headers = {
+            "Content-Type": "application/json",
+            "AuthorizationType": "ilink_bot_token",
+            "X-WECHAT-UIN": self._random_wechat_uin(),
+        }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
+
+    def _api_post(self, endpoint, body_dict, timeout=15):
+        import requests
+        url = f"{self.base_url}/{endpoint}"
+        resp = requests.post(url, json=body_dict, headers=self._build_headers(), timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _save_wc_config(self):
+        if "connectors" not in self.config:
+            self.config["connectors"] = {}
+        if "wechat" not in self.config["connectors"]:
+            self.config["connectors"]["wechat"] = {}
+        self.config["connectors"]["wechat"].update(self.wc_config)
+        ConfigManager.save(self.config)
+
+    # ------------------------------------------------------------------
+    # QR login
+    # ------------------------------------------------------------------
+
+    def _login_qr(self):
+        """Interactive QR login. Blocks until confirmed, expired limit, or timeout."""
+        import requests as req
+        base = self.base_url
+        qr_url_endpoint = f"{base}/ilink/bot/get_bot_qrcode?bot_type={self.BOT_TYPE}"
+
+        def _fetch_qr():
+            r = req.get(qr_url_endpoint, timeout=15)
+            r.raise_for_status()
+            d = r.json()
+            return d["qrcode"], d["qrcode_img_content"]
+
+        print("\n[🔐] WeChat QR login required")
+        try:
+            qrcode, qrcode_url = _fetch_qr()
+        except Exception as e:
+            print(f"[❌] Failed to fetch WeChat QR code: {e}")
+            return False
+
+        def _display_qr(url):
+            import qrcode as qr_lib
+            qr = qr_lib.QRCode(border=1)
+            qr.add_data(url)
+            qr.make(fit=True)
+            print()
+            qr.print_ascii(invert=True)
+            print(f"[*] 如二维码显示异常，请用浏览器打开链接扫码: {url}")
+
+        _display_qr(qrcode_url)
+
+        deadline = time.time() + 480
+        refresh_count = 0
+        max_refreshes = 3
+        scanned_printed = False
+
+        while time.time() < deadline:
+            try:
+                status_url = f"{base}/ilink/bot/get_qrcode_status?qrcode={qrcode}"
+                r = req.get(status_url, headers={"iLink-App-ClientVersion": "1"},
+                            timeout=self.LONG_POLL_TIMEOUT_S)
+                r.raise_for_status()
+                d = r.json()
+                status = d.get("status", "wait")
+
+                if status == "wait":
+                    pass
+                elif status == "scaned":
+                    if not scanned_printed:
+                        print("\n[👀] QR scanned — please confirm in WeChat...")
+                        scanned_printed = True
+                elif status == "expired":
+                    refresh_count += 1
+                    if refresh_count > max_refreshes:
+                        print("\n[❌] QR code expired too many times. Login aborted.")
+                        return False
+                    print(f"\n[⏳] QR expired, refreshing ({refresh_count}/{max_refreshes})...")
+                    try:
+                        qrcode, qrcode_url = _fetch_qr()
+                        scanned_printed = False
+                        _display_qr(qrcode_url)
+                    except Exception as e:
+                        print(f"[❌] Failed to refresh QR code: {e}")
+                        return False
+                elif status == "confirmed":
+                    if not d.get("ilink_bot_id"):
+                        print("[❌] Login confirmed but ilink_bot_id missing.")
+                        return False
+                    self.token = d.get("bot_token", "")
+                    self.base_url = (d.get("baseurl") or base).rstrip("/")
+                    self.authorized_id = d.get("ilink_user_id", "")
+                    account_id = d.get("ilink_bot_id", "")
+                    self.wc_config["token"] = self.token
+                    self.wc_config["base_url"] = self.base_url
+                    self.wc_config["authorized_id"] = self.authorized_id
+                    self.wc_config["account_id"] = account_id
+                    self._save_wc_config()
+                    print(f"\n[✅] WeChat login successful! Bot: {account_id}, User: {self.authorized_id}")
+                    return True
+            except req.exceptions.Timeout:
+                pass   # normal for long-poll
+            except Exception as e:
+                print(f"[!] WeChat QR poll error: {e}")
+                time.sleep(2)
+
+        print("\n[❌] WeChat login timed out.")
+        return False
+
+    # ------------------------------------------------------------------
+    # CDN download helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_aes_key(aes_key_b64):
+        """Mirror of parseAesKey in pic-decrypt.ts.
+        Accepts base64(raw 16 bytes) or base64(hex string of 16 bytes)."""
+        import re
+        decoded = base64.b64decode(aes_key_b64)
+        if len(decoded) == 16:
+            return decoded
+        if len(decoded) == 32 and re.fullmatch(b"[0-9a-fA-F]{32}", decoded):
+            return bytes.fromhex(decoded.decode("ascii"))
+        raise ValueError(f"aes_key must decode to 16 raw bytes or 32-char hex string, "
+                         f"got {len(decoded)} bytes")
+
+    @staticmethod
+    def _decrypt_aes_ecb(ciphertext, key):
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.primitives import padding as crypto_padding
+        dec = Cipher(algorithms.AES(key), modes.ECB()).decryptor()
+        padded = dec.update(ciphertext) + dec.finalize()
+        unpadder = crypto_padding.PKCS7(128).unpadder()
+        return unpadder.update(padded) + unpadder.finalize()
+
+    def _download_and_decrypt_cdn(self, encrypt_query_param, aes_key_b64):
+        import requests as req
+        from urllib.parse import quote
+        cdn_base = self.wc_config.get("cdn_base_url", self.CDN_BASE_URL)
+        url = f"{cdn_base}/download?encrypted_query_param={quote(encrypt_query_param)}"
+        r = req.get(url, timeout=60)
+        r.raise_for_status()
+        key = self._parse_aes_key(aes_key_b64)
+        return self._decrypt_aes_ecb(r.content, key)
+
+    # ------------------------------------------------------------------
+    # Inbound message handling
+    # ------------------------------------------------------------------
+
+    def _handle_message(self, msg):
+        from_user_id = msg.get("from_user_id", "")
+        context_token = msg.get("context_token")
+        if context_token:
+            self._context_tokens[from_user_id] = context_token
+
+        if self.authorized_id and from_user_id != self.authorized_id:
+            return
+
+        for item in msg.get("item_list", []):
+            item_type = item.get("type", 0)
+            if item_type == 1:   # TEXT
+                text = item.get("text_item", {}).get("text", "").strip()
+                if text and self.callback:
+                    print(f"📩 WeChat: {text}")
+                    threading.Thread(target=self.callback, args=(text,), daemon=True).start()
+                return
+            elif item_type == 3:  # VOICE — use transcribed text if available
+                voice_text = item.get("voice_item", {}).get("text", "").strip()
+                if voice_text and self.callback:
+                    print(f"📩 WeChat: [Voice] {voice_text}")
+                    threading.Thread(target=self.callback, args=(voice_text,), daemon=True).start()
+                return
+            elif item_type == 2:  # IMAGE
+                media = item.get("image_item", {}).get("media", {})
+                eqp = media.get("encrypt_query_param")
+                aes_key = media.get("aes_key") or item.get("image_item", {}).get("aeskey")
+                print("📩 WeChat: [Image]")
+                if eqp and aes_key and self.callback:
+                    def _send_image(eqp=eqp, aes_key=aes_key):
+                        try:
+                            image_bytes = self._download_and_decrypt_cdn(eqp, aes_key)
+                            content = prepare_image_content(image_bytes, "这张图片里有什么？")
+                            self.callback(content)
+                        except Exception as e:
+                            print(f"[!] WeChat image download error: {e}")
+                            self.callback("[Image received]")
+                    threading.Thread(target=_send_image, daemon=True).start()
+                elif self.callback:
+                    threading.Thread(target=self.callback,
+                                     args=("[Image received]",), daemon=True).start()
+                return
+            elif item_type == 4:  # FILE
+                file_item = item.get("file_item", {})
+                file_name = file_item.get("file_name", "file")
+                media = file_item.get("media", {})
+                eqp = media.get("encrypt_query_param")
+                aes_key = media.get("aes_key")
+                print(f"📩 WeChat: [File: {file_name}]")
+                if eqp and aes_key and self.file_saver and self.callback:
+                    def _send_file(file_name=file_name, eqp=eqp, aes_key=aes_key):
+                        try:
+                            file_bytes = self._download_and_decrypt_cdn(eqp, aes_key)
+                            file_path = self.file_saver(file_name, file_bytes)
+                            self.callback(f"[Uploaded file: {file_path}]")
+                        except Exception as e:
+                            print(f"[!] WeChat file download error: {e}")
+                            self.callback(f"[File received: {file_name}]")
+                    threading.Thread(target=_send_file, daemon=True).start()
+                elif self.callback:
+                    threading.Thread(target=self.callback,
+                                     args=(f"[File received: {file_name}]",), daemon=True).start()
+                return
+
+    # ------------------------------------------------------------------
+    # Connector interface
+    # ------------------------------------------------------------------
+
+    def listen(self, callback, stop_on_auth=False):
+        self.callback = callback
+        print("\n--- MMClaw Kernel Active (WeChat Mode) ---")
+
+        if not self.token:
+            if not self._login_qr():
+                return
+        elif stop_on_auth:
+            print(f"\n[✅] WeChat identity already verified: {self.authorized_id}")
+            return
+
+        if stop_on_auth:
+            return
+
+        print(f"[*] Listening for WeChat messages from: {self.authorized_id or '(any)'}")
+
+        def _poll_loop():
+            consecutive_failures = 0
+            while not self._stop_event.is_set():
+                try:
+                    body = {
+                        "get_updates_buf": self._get_updates_buf,
+                        "base_info": {"channel_version": self.CHANNEL_VERSION},
+                    }
+                    data = self._api_post("ilink/bot/getupdates", body,
+                                          timeout=self.LONG_POLL_TIMEOUT_S + 5)
+
+                    ret = data.get("ret", 0)
+                    errcode = data.get("errcode", 0)
+                    if ret != 0 or errcode != 0:
+                        consecutive_failures += 1
+                        print(f"[!] WeChat getUpdates error: ret={ret} errcode={errcode} "
+                              f"errmsg={data.get('errmsg', '')}")
+                        delay = 30 if consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES else 2
+                        if consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                            consecutive_failures = 0
+                        self._stop_event.wait(delay)
+                        continue
+
+                    consecutive_failures = 0
+                    new_buf = data.get("get_updates_buf", "")
+                    if new_buf and new_buf != self._get_updates_buf:
+                        self._get_updates_buf = new_buf
+                        self.wc_config["get_updates_buf"] = new_buf
+                        self._save_wc_config()
+
+                    for msg in data.get("msgs", []):
+                        self._handle_message(msg)
+
+                except Exception as e:
+                    # requests.Timeout is also caught here — that's normal for long-poll
+                    import requests
+                    if isinstance(e, requests.exceptions.Timeout):
+                        continue
+                    consecutive_failures += 1
+                    print(f"[!] WeChat poll error: {e}")
+                    delay = 30 if consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES else 2
+                    if consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                        consecutive_failures = 0
+                    self._stop_event.wait(delay)
+
+        threading.Thread(target=_poll_loop, daemon=True).start()
+        self._stop_event.wait()
+
+    def start_typing(self):
+        self._typing = True
+        user_id = self.authorized_id
+        if not user_id:
+            return
+
+        def _type_loop():
+            ticket = None
+            while self._typing:
+                try:
+                    if not ticket:
+                        cfg_data = self._api_post(
+                            "ilink/bot/getconfig",
+                            {"ilink_user_id": user_id,
+                             "context_token": self._context_tokens.get(user_id, ""),
+                             "base_info": {"channel_version": self.CHANNEL_VERSION}},
+                            timeout=10,
+                        )
+                        ticket = cfg_data.get("typing_ticket")
+                    if ticket:
+                        self._api_post(
+                            "ilink/bot/sendtyping",
+                            {"ilink_user_id": user_id, "typing_ticket": ticket,
+                             "status": 1,
+                             "base_info": {"channel_version": self.CHANNEL_VERSION}},
+                            timeout=10,
+                        )
+                except Exception:
+                    ticket = None
+                self._stop_event.wait(4)
+
+        threading.Thread(target=_type_loop, daemon=True).start()
+
+    def stop_typing(self):
+        self._typing = False
+        user_id = self.authorized_id
+        if not user_id or not self.token:
+            return
+        try:
+            cfg_data = self._api_post(
+                "ilink/bot/getconfig",
+                {"ilink_user_id": user_id,
+                 "context_token": self._context_tokens.get(user_id, ""),
+                 "base_info": {"channel_version": self.CHANNEL_VERSION}},
+                timeout=10,
+            )
+            ticket = cfg_data.get("typing_ticket")
+            if ticket:
+                self._api_post(
+                    "ilink/bot/sendtyping",
+                    {"ilink_user_id": user_id, "typing_ticket": ticket,
+                     "status": 2,
+                     "base_info": {"channel_version": self.CHANNEL_VERSION}},
+                    timeout=10,
+                )
+        except Exception:
+            pass
+
+    def send(self, message):
+        if not self.authorized_id or not self.token:
+            return
+        import uuid
+        limit = 4000
+        for chunk in [message[i:i+limit] for i in range(0, len(message), limit)]:
+            try:
+                msg_obj = {
+                    "from_user_id": "",
+                    "to_user_id": self.authorized_id,
+                    "client_id": str(uuid.uuid4()),
+                    "message_type": 2,   # BOT
+                    "message_state": 2,  # FINISH
+                    "item_list": [{"type": 1, "text_item": {"text": f"⚡ {chunk}"}}],
+                }
+                context_token = self._context_tokens.get(self.authorized_id)
+                if context_token:
+                    msg_obj["context_token"] = context_token
+                self._api_post(
+                    "ilink/bot/sendmessage",
+                    {"msg": msg_obj, "base_info": {"channel_version": self.CHANNEL_VERSION}},
+                    timeout=15,
+                )
+            except Exception as e:
+                print(f"[!] WeChat send error: {e}")
+                break
+
+    # ------------------------------------------------------------------
+    # CDN upload helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _aes_ecb_padded_size(plaintext_size):
+        import math
+        return math.ceil((plaintext_size + 1) / 16) * 16
+
+    @staticmethod
+    def _encrypt_aes_ecb(plaintext, key):
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.primitives import padding as crypto_padding
+        padder = crypto_padding.PKCS7(128).padder()
+        padded = padder.update(plaintext) + padder.finalize()
+        enc = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
+        return enc.update(padded) + enc.finalize()
+
+    def _upload_to_cdn(self, file_path, to_user_id, media_type):
+        """Encrypt file and upload to WeChat CDN. Returns upload info dict."""
+        import hashlib
+        import requests as req
+        from urllib.parse import quote
+
+        with open(file_path, "rb") as f:
+            plaintext = f.read()
+
+        rawsize = len(plaintext)
+        rawfilemd5 = hashlib.md5(plaintext).hexdigest()
+        aeskey = os.urandom(16)
+        filekey = os.urandom(16).hex()
+        filesize = self._aes_ecb_padded_size(rawsize)
+
+        upload_resp = self._api_post("ilink/bot/getuploadurl", {
+            "filekey": filekey,
+            "media_type": media_type,
+            "to_user_id": to_user_id,
+            "rawsize": rawsize,
+            "rawfilemd5": rawfilemd5,
+            "filesize": filesize,
+            "no_need_thumb": True,
+            "aeskey": aeskey.hex(),
+            "base_info": {"channel_version": self.CHANNEL_VERSION},
+        })
+
+        upload_param = upload_resp.get("upload_param")
+        if not upload_param:
+            raise RuntimeError(f"getuploadurl returned no upload_param: {upload_resp}")
+
+        ciphertext = self._encrypt_aes_ecb(plaintext, aeskey)
+        cdn_base = self.wc_config.get("cdn_base_url", self.CDN_BASE_URL)
+        cdn_url = (f"{cdn_base}/upload"
+                   f"?encrypted_query_param={quote(upload_param)}"
+                   f"&filekey={quote(filekey)}")
+
+        download_param = None
+        for attempt in range(1, 4):
+            r = req.post(cdn_url, data=ciphertext,
+                         headers={"Content-Type": "application/octet-stream"},
+                         timeout=120)
+            if 400 <= r.status_code < 500:
+                raise RuntimeError(f"CDN upload client error {r.status_code}: "
+                                   f"{r.headers.get('x-error-message', r.text)}")
+            if r.status_code != 200:
+                if attempt < 3:
+                    continue
+                raise RuntimeError(f"CDN upload failed after 3 attempts: {r.status_code}")
+            download_param = r.headers.get("x-encrypted-param")
+            if download_param:
+                break
+            if attempt == 3:
+                raise RuntimeError("CDN upload response missing x-encrypted-param header")
+
+        return {
+            "download_encrypted_query_param": download_param,
+            "aeskey": aeskey,
+            "file_size": rawsize,
+            "file_size_ciphertext": filesize,
+            "filekey": filekey,
+        }
+
+    def _send_media_message(self, to_user_id, context_token, item):
+        import uuid
+        msg_obj = {
+            "from_user_id": "",
+            "to_user_id": to_user_id,
+            "client_id": str(uuid.uuid4()),
+            "message_type": 2,
+            "message_state": 2,
+            "item_list": [item],
+        }
+        if context_token:
+            msg_obj["context_token"] = context_token
+        self._api_post(
+            "ilink/bot/sendmessage",
+            {"msg": msg_obj, "base_info": {"channel_version": self.CHANNEL_VERSION}},
+            timeout=15,
+        )
+
+    def send_file(self, path):
+        if not self.authorized_id or not self.token:
+            return
+        import mimetypes
+        full_path = os.path.abspath(os.path.expanduser(path))
+        if not os.path.exists(full_path):
+            self.send(f"[File not found: {path}]")
+            return
+
+        mime = mimetypes.guess_type(full_path)[0] or "application/octet-stream"
+        context_token = self._context_tokens.get(self.authorized_id)
+
+        def _aes_key_b64(raw_key):
+            # WeChat expects base64(hex_string_of_key) — NOT base64(raw_bytes).
+            # parseAesKey on the client side: if decoded length == 32 and all hex chars,
+            # it re-parses as hex to recover the 16-byte key. See pic-decrypt.ts.
+            return base64.b64encode(raw_key.hex().encode("ascii")).decode()
+
+        try:
+            if mime.startswith("image/"):
+                info = self._upload_to_cdn(full_path, self.authorized_id, self._MEDIA_IMAGE)
+                item = {
+                    "type": self._ITEM_IMAGE,
+                    "image_item": {
+                        "media": {
+                            "encrypt_query_param": info["download_encrypted_query_param"],
+                            "aes_key": _aes_key_b64(info["aeskey"]),
+                            "encrypt_type": 1,
+                        },
+                        "mid_size": info["file_size_ciphertext"],
+                    },
+                }
+            elif mime.startswith("video/"):
+                info = self._upload_to_cdn(full_path, self.authorized_id, self._MEDIA_VIDEO)
+                item = {
+                    "type": self._ITEM_VIDEO,
+                    "video_item": {
+                        "media": {
+                            "encrypt_query_param": info["download_encrypted_query_param"],
+                            "aes_key": _aes_key_b64(info["aeskey"]),
+                            "encrypt_type": 1,
+                        },
+                        "video_size": info["file_size_ciphertext"],
+                    },
+                }
+            else:
+                info = self._upload_to_cdn(full_path, self.authorized_id, self._MEDIA_FILE)
+                item = {
+                    "type": self._ITEM_FILE,
+                    "file_item": {
+                        "media": {
+                            "encrypt_query_param": info["download_encrypted_query_param"],
+                            "aes_key": _aes_key_b64(info["aeskey"]),
+                            "encrypt_type": 1,
+                        },
+                        "file_name": os.path.basename(full_path),
+                        "len": str(info["file_size"]),
+                    },
+                }
+            self._send_media_message(self.authorized_id, context_token, item)
+        except Exception as e:
+            print(f"[!] WeChat send_file error: {e}")
+            self.send(f"[File upload failed: {e}]")
+
+
 class QQBotConnector(object):
     def __init__(self, app_id, app_secret, config=None):
         try:

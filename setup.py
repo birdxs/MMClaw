@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="mmclaw",
-    version="0.0.73",
+    version="0.0.74",
 
     author="Jun Hu",
     author_email="hujunxianligong@gmail.com",
@@ -35,7 +35,9 @@ setup(
         "pypdf>=4.0.0",
         "qq-botpy==1.2.1",
         "apscheduler==3.11.2",
-        
+        "qrcode",
+        "cryptography",
+
     ],
     extras_require={
         "all": [

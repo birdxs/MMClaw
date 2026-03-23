@@ -30,6 +30,12 @@ MMClaw strips away the complexity, offering a crystal-clear, readable architectu
 
 ---
 
+## 🆕 What's New
+
+**WeChat (微信) connector — Pure Python, zero extra dependencies.**
+Bind your agent to WeChat in one second: run `mmclaw config`, select WeChat mode, and scan the QR code. That's it. No Node.js, no webhooks, no app registration. Your agent is live on WeChat instantly.
+
+
 ## ✨ Featured: 🤝 ClawMeets — Agent-to-Agent Messaging
 
 <p align="center">
@@ -42,7 +48,7 @@ MMClaw strips away the complexity, offering a crystal-clear, readable architectu
 
 Control your AI agent from anywhere, through the apps you already use.
 
-- **Chat & Automate** — Send messages via Telegram, WhatsApp, Feishu (飞书), or QQ Bot (QQ机器人) to ask questions, run commands, manage files, or delegate complex multi-step tasks to your agent.
+- **Chat & Automate** — Send messages via Telegram, WhatsApp, WeChat (微信), Feishu (飞书), or QQ Bot (QQ机器人) to ask questions, run commands, manage files, or delegate complex multi-step tasks to your agent.
 - **Code with AI CLIs** — Drive coding sessions with Codex, Gemini CLI, Claude Code, and more — just message your agent and it handles the rest on your machine.
 - **Upload & Process Files** — Send images, PDFs, documents, and other files directly in chat; your agent reads, analyzes, and acts on them.
 - **Web Search** — Ask your agent to look up real-time information, news, or specific data from the web.
@@ -62,7 +68,7 @@ Control your AI agent from anywhere, through the apps you already use.
 * Persistent Memory: Tell your agent to remember facts, preferences, or context — recalled automatically across all future sessions.
 * Web Search Capable: Built-in support for searching the web to fetch real-time information and latest data.
 * Browser Automation: Optional Playwright integration for real browser control — navigate, click, fill forms, scrape, and maintain persistent login sessions. Enable via `mmclaw config`.
-* Multi-Channel Interaction: Built-in support for interacting with your agent via Telegram, WhatsApp, Feishu (飞书), QQ Bot (QQ机器人), and more—all handled through pure Python integrations.
+* Multi-Channel Interaction: Built-in support for interacting with your agent via Telegram, WhatsApp, WeChat (微信), Feishu (飞书), QQ Bot (QQ机器人), and more—all handled through pure Python integrations.
 * **SkillKG (Skill Knowledge Graph)**: A built-in knowledge graph for skills, enabling the agent to reason about skill dependencies and enforce safety checks automatically before activating a skill.
 
 ## 🚀 Quick Start
@@ -90,7 +96,8 @@ The trend in AI agents is moving towards massive complexity. MMClaw moves toward
 MMClaw allows you to interact with your agent through multiple channels:
 
 - **Terminal Mode**: Standard interactive CLI (default).
-- **Telegram Mode**: No external dependencies. Just create a bot via [@BotFather](https://t.me/botfather) and provide your token during setup.
+- **Telegram Mode**: Just create a bot via [@BotFather](https://t.me/botfather) and provide your token during setup.
+- **WeChat (微信) Mode**: The fastest setup of any connector — just scan a QR code once and you're connected. Nothing else required.
 - **Feishu (飞书) Mode**: Dedicated support for Chinese users. Features the **most detailed step-by-step setup guide** in the industry, utilizing long-connections so you don't need a public IP or complex webhooks.
 - **QQ Bot (QQ机器人) Mode**: Native support for QQ's official bot platform. Register at [q.qq.com](https://q.qq.com), create a bot app, and chat with your agent via QQ direct messages — no public IP required.
 - **WhatsApp Mode**: Requires **Node.js** (v22.17.0 recommended) to run the lightweight bridge. The agent will show a QR code in your terminal for linking.
